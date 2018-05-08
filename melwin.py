@@ -62,8 +62,8 @@ import logging
 #print(spyne._version)
 
 class MelwinService(ServiceBase):
-    @srpc(_, Unicode, Integer, _returns=Iterable(Unicode))
-    def say_hello(self, name, numbers):
+    @srpc(Unicode, Integer, _returns=Iterable(Unicode))
+    def say_hello(name, numbers):
         """
         Docstrings for service methods appear as documentation in the wsdl
         <b>what fun</b>
