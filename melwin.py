@@ -1,67 +1,56 @@
-#!/usr/bin/env python
-# encoding: utf8
-#
-# Copyright © Burak Arslan <burak at arskom dot com dot tr>,
-#             Arskom Ltd. http://www.arskom.com.tr
-# All rights reserved.
-#
-# Redistribution and use in source and binary forms, with or without
-# modification, are permitted provided that the following conditions are met:
-#
-#    1. Redistributions of source code must retain the above copyright notice,
-#       this list of conditions and the following disclaimer.
-#    2. Redistributions in binary form must reproduce the above copyright
-#       notice, this list of conditions and the following disclaimer in the
-#       documentation and/or other materials provided with the distribution.
-#    3. Neither the name of the owner nor the names of its contributors may be
-#       used to endorse or promote products derived from this software without
-#       specific prior written permission.
-#
-# THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
-# AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
-# IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
-# DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER BE LIABLE FOR ANY DIRECT,
-# INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING,
-# BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE,
-# DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY
-# OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING
-# NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE,
-# EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
-#
-
-
-"""
-This is a simple HelloWorld example to show the basics of writing
-a webservice using spyne, starting a server, and creating a service
-client.
-
-Here's how to call it using suds:
-
->>> from suds.client import Client
->>> c = Client('http://localhost:8000/?wsdl')
->>> c.service.say_hello('punk', 5)
-(stringArray){
-   string[] =
-      "Hello, punk",
-      "Hello, punk",
-      "Hello, punk",
-      "Hello, punk",
-      "Hello, punk",
- }
->>>
-
-"""
-
-
-from spyne import rpc, srpc, ServiceBase, ComplexModel, Iterable, Integer, Unicode
+from spyne import rpc, srpc, ServiceBase, ComplexModel, Iterable, Integer, Unicode, Boolean, Date, DateTime
 
 from spyne.util.simple import wsgi_soap_application
 
 import logging
+import dateutil.parser
+import requests
+import api
 
-#print(spyne._version)
+# print(spyne._version)PersonID, Etternavn, Fornavn, fødselsdato ,kjønn, epost, mobiltelefon Postadresse, postnummer
+# Takes the return and transforms to
+class Person(ComplexModel):
+    Id = Integer
+    MelwinId = Integer
+    Name = Unicode
+    BirthDate = DateTime
+    GenderId = Integer
+    GenderText = Unicode
+    Email = Unicode
+    Phone = Unicode
+    Address = Unicode
+    PostNumber = Unicode
+    City = Unicode
+    MemberFeeStatus = Integer
+    Updated = DateTime
+    Created = DateTime
+    MongoId = Unicode
+
+class MelwinUpdated(ComplexModel):
+    status = Unicode
+    status_code = Integer
+    PersonId = Integer
+    MelwinId = Integer
+
+
+def get_api_key():
+    return 'Basic %s' % api.key
+
+def get_api_url():
+    return 'https://medlem.nlf.no/api/v1/ka'
+
+def get_api_headers():
+    return {
+        'Authorization': get_api_key(),
+        'Accept': 'application/json',
+        'Content-Type': 'application/json',
+        'Accept-Encoding': 'gzip, deflate, br'
+        }
 
 class MelwinService(ServiceBase):
+
+
+
     @srpc(Unicode, Integer, _returns=Iterable(Unicode))
     def say_hello(name, numbers):
         """
@@ -73,6 +62,69 @@ class MelwinService(ServiceBase):
         """
 
         return u'Hello, %s' % name
+
+    @srpc(Unicode, Boolean, _returns=Iterable(Person))
+    def members(ClubId, MelwinId=False):
+        """
+        Members by KL number and if MelwinId or not
+        @param ClubId
+        @param MelwinId
+        @return
+        """
+        club_resp = requests.get('%s/clubs/?where={"NifOrganisationNumber":"%s"}' % (get_api_url(), ClubId),
+                            headers=get_api_headers())
+        if club_resp.status_code != 200:
+            return [{}]
+        else:
+            clubs = club_resp.json()['_items']
+
+            print(clubs)
+
+            if len(clubs) == 1:
+                club_id = clubs[0]['Id']
+
+        member_resp = requests.get('%s/members/?where={"clubs":{"$in":[%s]}}' % (get_api_url(), club_id),
+                                 headers=get_api_headers())
+
+
+        if member_resp.status_code != 200:
+            return [{}]
+        else:
+            #print(member_resp.json()['_items'][0])
+
+            m = member_resp.json()['_items']
+            for key, value in enumerate(m): # strptime(modified, '%Y-%m-%dT%H:%M:%S.000Z')
+                m[key]['BirthDate'] = dateutil.parser.parse(m[key]['BirthDate'])
+                m[key]['Updated'] = dateutil.parser.parse(m[key]['_updated'])
+                m[key]['Created'] = dateutil.parser.parse(m[key]['_created'])
+                m[key]['MongoId'] = m[key]['_id']
+                #print(m[key])
+                #exit(0)
+            return m
+
+    @srpc(Integer, Integer, _returns=MelwinUpdated)
+    def set_melwin_id(PersonId, MelwinId):
+
+        user_resp = requests.get('%s/members/%s' % (get_api_url(), PersonId),
+                                   headers=get_api_headers())
+
+        if user_resp.status_code == 200:
+            user = user_resp.json()
+
+            user_header = get_api_headers()
+            user_header.update({'If-Match': user['_etag']})
+
+            update_resp = requests.patch('%s/members/%s' % (get_api_url(), user['_id']),
+                                         json={'MelwinId': MelwinId},
+                                   headers=user_header)
+
+            print(update_resp.text)
+            print(update_resp.status_code)
+
+            return {'status': 'OK', 'status_code': update_resp.status_code, 'PersonId': PersonId, 'MelwinId': MelwinId}
+
+        else:
+            return {'status': 'ERR', 'status_code': user_resp.status_code, 'PersonId': PersonId, 'MelwinId': MelwinId}
 
 
 if __name__ == '__main__':
