@@ -54,8 +54,8 @@ class MelwinService(ServiceBase):
     @srpc(Unicode, Integer, _returns=Iterable(Unicode))
     def say_hello(name, numbers):
         """
-        Docstrings for service methods appear as documentation in the wsdl
-        <b>what fun</b>
+        Say hello!
+        <b>Hello hello</b>
         @param name the name to say hello to
         @param numbers the number of times
         @return the completed array
@@ -63,68 +63,83 @@ class MelwinService(ServiceBase):
 
         return u'Hello, %s' % name
 
-    @srpc(Unicode, Boolean, _returns=Iterable(Person))
-    def members(ClubId, MelwinId=False):
+    @srpc(Unicode, Unicode, Boolean, _returns=Iterable(Person))
+    def get_members(ApiKey, ClubId, MelwinId=False):
         """
         Members by KL number and if MelwinId or not
-        @param ClubId
-        @param MelwinId
+        @Param ApiKey secret API key String
+        @param ClubId the club KL number String
+        @param MelwinId get users with or without MelwinId True|False
         @return
         """
-        club_resp = requests.get('%s/clubs/?where={"NifOrganisationNumber":"%s"}' % (get_api_url(), ClubId),
-                            headers=get_api_headers())
-        if club_resp.status_code != 200:
-            return [{}]
+        if ApiKey == api.key:
+            club_resp = requests.get('%s/clubs/?where={"NifOrganisationNumber":"%s"}' % (get_api_url(), ClubId),
+                                headers=get_api_headers())
+            if club_resp.status_code != 200:
+                return [{}]
+            else:
+                clubs = club_resp.json()['_items']
+
+                print(clubs)
+
+                if len(clubs) == 1:
+                    club_id = clubs[0]['Id']
+
+            member_resp = requests.get('%s/members/?where={"clubs":{"$in":[%s]}}' % (get_api_url(), club_id),
+                                     headers=get_api_headers())
+
+
+            if member_resp.status_code != 200:
+                return [{}]
+            else:
+                #print(member_resp.json()['_items'][0])
+
+                m = member_resp.json()['_items']
+                for key, value in enumerate(m): # strptime(modified, '%Y-%m-%dT%H:%M:%S.000Z')
+                    m[key]['BirthDate'] = dateutil.parser.parse(m[key]['BirthDate'])
+                    m[key]['Updated'] = dateutil.parser.parse(m[key]['_updated'])
+                    m[key]['Created'] = dateutil.parser.parse(m[key]['_created'])
+                    m[key]['MongoId'] = m[key]['_id']
+                    #print(m[key])
+                    #exit(0)
+                return m
         else:
-            clubs = club_resp.json()['_items']
+            return {'status': 'ERR', 'status_code': 403}
 
-            print(clubs)
+    @srpc(Unicode, Integer, Integer, _returns=MelwinUpdated)
+    def set_melwin_id(ApiKey, PersonId, MelwinId):
+        """
+       Set MelwinId for Person
+       @Param ApiKey
+       @param PersonId
+       @param MelwinId
+       @return
+       """
 
-            if len(clubs) == 1:
-                club_id = clubs[0]['Id']
+        if ApiKey == api.key:
 
-        member_resp = requests.get('%s/members/?where={"clubs":{"$in":[%s]}}' % (get_api_url(), club_id),
-                                 headers=get_api_headers())
+            user_resp = requests.get('%s/members/%s' % (get_api_url(), PersonId),
+                                       headers=get_api_headers())
 
+            if user_resp.status_code == 200:
+                user = user_resp.json()
 
-        if member_resp.status_code != 200:
-            return [{}]
+                user_header = get_api_headers()
+                user_header.update({'If-Match': user['_etag']})
+
+                update_resp = requests.patch('%s/members/%s' % (get_api_url(), user['_id']),
+                                             json={'MelwinId': MelwinId},
+                                       headers=user_header)
+
+                print(update_resp.text)
+                print(update_resp.status_code)
+
+                return {'status': 'OK', 'status_code': update_resp.status_code, 'PersonId': PersonId, 'MelwinId': MelwinId}
+
+            else:
+                return {'status': 'ERR', 'status_code': user_resp.status_code, 'PersonId': PersonId, 'MelwinId': MelwinId}
         else:
-            #print(member_resp.json()['_items'][0])
-
-            m = member_resp.json()['_items']
-            for key, value in enumerate(m): # strptime(modified, '%Y-%m-%dT%H:%M:%S.000Z')
-                m[key]['BirthDate'] = dateutil.parser.parse(m[key]['BirthDate'])
-                m[key]['Updated'] = dateutil.parser.parse(m[key]['_updated'])
-                m[key]['Created'] = dateutil.parser.parse(m[key]['_created'])
-                m[key]['MongoId'] = m[key]['_id']
-                #print(m[key])
-                #exit(0)
-            return m
-
-    @srpc(Integer, Integer, _returns=MelwinUpdated)
-    def set_melwin_id(PersonId, MelwinId):
-
-        user_resp = requests.get('%s/members/%s' % (get_api_url(), PersonId),
-                                   headers=get_api_headers())
-
-        if user_resp.status_code == 200:
-            user = user_resp.json()
-
-            user_header = get_api_headers()
-            user_header.update({'If-Match': user['_etag']})
-
-            update_resp = requests.patch('%s/members/%s' % (get_api_url(), user['_id']),
-                                         json={'MelwinId': MelwinId},
-                                   headers=user_header)
-
-            print(update_resp.text)
-            print(update_resp.status_code)
-
-            return {'status': 'OK', 'status_code': update_resp.status_code, 'PersonId': PersonId, 'MelwinId': MelwinId}
-
-        else:
-            return {'status': 'ERR', 'status_code': user_resp.status_code, 'PersonId': PersonId, 'MelwinId': MelwinId}
+            return {'status': 'ERR', 'status_code': 403}
 
 
 if __name__ == '__main__':
