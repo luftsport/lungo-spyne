@@ -63,7 +63,7 @@ import logging
 
 class MelwinService(ServiceBase):
     @srpc(Unicode, Integer, _returns=Iterable(Unicode))
-    def say_hello(name, numbers):
+    def say_hello(self, name, numbers):
         """
         Docstrings for service methods appear as documentation in the wsdl
         <b>what fun</b>
