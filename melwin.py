@@ -68,8 +68,7 @@ class MelwinService(ServiceBase):
         Docstrings for service methods appear as documentation in the wsdl
         <b>what fun</b>
         @param name the name to say hello to
-        @param number the number of times
-        @param the number of times to say hello
+        @param numbers the number of times
         @return the completed array
         """
 
