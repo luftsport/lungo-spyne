@@ -26,6 +26,7 @@ class Person(ComplexModel):
     Updated = DateTime
     Created = DateTime
     MongoId = Unicode
+    IsActive = Boolean
 
 
 class MelwinUpdated(ComplexModel):
@@ -65,28 +66,39 @@ class MelwinService(ServiceBase):
 
         return u'Hello, %s' % name
 
-    @srpc(Unicode, Unicode, Integer, Array(Integer), _returns=Iterable(Person))
-    def get_members(ApiKey, ClubId, MelwinId=0, PaymentStatus=[]):
+    @srpc(Unicode, Unicode, Integer, Array(Integer), Integer, _returns=Iterable(Person))
+    def get_members(ApiKey, ClubId, MelwinId=0, PaymentStatus=[], IsActive=0):
         """
         Members by KL number and if MelwinId or not
         @param ApiKey secret API key String, mandatory
         @param ClubId the club KL number String, mandatory
         @param MelwinId get users with (1), without (-1) or all (0) MelwinId, defaults to 0
         @param PaymentStatus array of integers to include, defaults to all
+        @param IsActive integer 1=True, -1=False, 0=all
         @return
         """
 
         if ApiKey == api.key:
 
-            if MelwinId < 0:
+            if MelwinId is None:
+                melwin_query = ''
+            elif MelwinId < 0:
                 melwin_query = ',"MelwinId":null'
             elif MelwinId > 0:
                 melwin_query = ',"MelwinId":{"$ne":null}'
             else:
                 melwin_query = ''
 
-            if isinstance(PaymentStatus, list) and len(PaymentStatus) > 0:
+            if PaymentStatus is not None and isinstance(PaymentStatus, list) and len(PaymentStatus) > 0:
                 melwin_query = '%s,"MemberFeeStatus": {"$in": [%s]}' % (melwin_query, ','.join(str(x) for x in PaymentStatus))
+
+            if IsActive is None:
+                pass
+            elif IsActive < 0:
+                melwin_query = '%s,"IsActive":false' % melwin_query
+            elif IsActive > 0:
+                melwin_query = '%s,"IsActive":true' % melwin_query
+
 
             club_resp = requests.get('%s/clubs/?where={"NifOrganisationNumber":"%s"}' % (get_api_url(), ClubId),
                                      headers=get_api_headers())
@@ -121,7 +133,7 @@ class MelwinService(ServiceBase):
         else:
             return {'status': 'ERR', 'status_code': 403}
 
-    @srpc(Unicode, Integer, Integer, _returns=MelwinUpdated)
+    @srpc(Unicode, Unicode, Integer, _returns=MelwinUpdated)
     def set_melwin_id(ApiKey, PersonId, MelwinId):
         """
         Set MelwinId for Person
