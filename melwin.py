@@ -1,4 +1,4 @@
-from spyne import rpc, srpc, ServiceBase, ComplexModel, Iterable, Integer, Unicode, Boolean, Date, DateTime
+from spyne import rpc, srpc, ServiceBase, ComplexModel, Iterable, Integer, Unicode, Boolean, Date, DateTime, Array
 
 from spyne.util.simple import wsgi_soap_application
 
@@ -6,6 +6,7 @@ import logging
 import dateutil.parser
 import requests
 import api
+
 
 # print(spyne._version)PersonID, Etternavn, Fornavn, fødselsdato ,kjønn, epost, mobiltelefon Postadresse, postnummer
 # Takes the return and transforms to
@@ -26,6 +27,7 @@ class Person(ComplexModel):
     Created = DateTime
     MongoId = Unicode
 
+
 class MelwinUpdated(ComplexModel):
     status = Unicode
     status_code = Integer
@@ -36,8 +38,10 @@ class MelwinUpdated(ComplexModel):
 def get_api_key():
     return 'Basic %s' % api.key
 
+
 def get_api_url():
     return 'https://medlem.nlf.no/api/v1/ka'
+
 
 def get_api_headers():
     return {
@@ -45,12 +49,10 @@ def get_api_headers():
         'Accept': 'application/json',
         'Content-Type': 'application/json',
         'Accept-Encoding': 'gzip, deflate, br'
-        }
+    }
+
 
 class MelwinService(ServiceBase):
-
-
-
     @srpc(Unicode, Integer, _returns=Iterable(Unicode))
     def say_hello(name, numbers):
         """
@@ -63,18 +65,31 @@ class MelwinService(ServiceBase):
 
         return u'Hello, %s' % name
 
-    @srpc(Unicode, Unicode, Boolean, _returns=Iterable(Person))
-    def get_members(ApiKey, ClubId, MelwinId=False):
+    @srpc(Unicode, Unicode, Integer, Array(Integer), _returns=Iterable(Person))
+    def get_members(ApiKey, ClubId, MelwinId=0, PaymentStatus=[]):
         """
         Members by KL number and if MelwinId or not
-        @param ApiKey secret API key String
-        @param ClubId the club KL number String
-        @param MelwinId get users with or without MelwinId True|False
+        @param ApiKey secret API key String, mandatory
+        @param ClubId the club KL number String, mandatory
+        @param MelwinId get users with (1), without (-1) or all (0) MelwinId, defaults to 0
+        @param PaymentStatus array of integers to include, defaults to all
         @return
         """
+
         if ApiKey == api.key:
+
+            if MelwinId < 0:
+                melwin_query = ',"MelwinId":null'
+            elif MelwinId > 0:
+                melwin_query = ',"MelwinId":{"$ne":null}'
+            else:
+                melwin_query = ''
+
+            if isinstance(PaymentStatus, list) and len(PaymentStatus) > 0:
+                melwin_query = '%s,"MemberFeeStatus": {"$in": [%s]}' % (melwin_query, ','.join(str(x) for x in PaymentStatus))
+
             club_resp = requests.get('%s/clubs/?where={"NifOrganisationNumber":"%s"}' % (get_api_url(), ClubId),
-                                headers=get_api_headers())
+                                     headers=get_api_headers())
             if club_resp.status_code != 200:
                 return [{}]
             else:
@@ -85,23 +100,23 @@ class MelwinService(ServiceBase):
                 if len(clubs) == 1:
                     club_id = clubs[0]['Id']
 
-            member_resp = requests.get('%s/members/?where={"clubs":{"$in":[%s]}}' % (get_api_url(), club_id),
-                                     headers=get_api_headers())
-
+            member_resp = requests.get('%s/members/?where={"clubs":{"$in":[%s]}%s}' %
+                                       (get_api_url(), club_id, melwin_query),
+                                       headers=get_api_headers())
 
             if member_resp.status_code != 200:
                 return [{}]
             else:
-                #print(member_resp.json()['_items'][0])
+                # print(member_resp.json()['_items'][0])
 
                 m = member_resp.json()['_items']
-                for key, value in enumerate(m): # strptime(modified, '%Y-%m-%dT%H:%M:%S.000Z')
+                for key, value in enumerate(m):  # strptime(modified, '%Y-%m-%dT%H:%M:%S.000Z')
                     m[key]['BirthDate'] = dateutil.parser.parse(m[key]['BirthDate'])
                     m[key]['Updated'] = dateutil.parser.parse(m[key]['_updated'])
                     m[key]['Created'] = dateutil.parser.parse(m[key]['_created'])
                     m[key]['MongoId'] = m[key]['_id']
-                    #print(m[key])
-                    #exit(0)
+                    # print(m[key])
+                    # exit(0)
                 return m
         else:
             return {'status': 'ERR', 'status_code': 403}
@@ -109,17 +124,17 @@ class MelwinService(ServiceBase):
     @srpc(Unicode, Integer, Integer, _returns=MelwinUpdated)
     def set_melwin_id(ApiKey, PersonId, MelwinId):
         """
-       Set MelwinId for Person
-       @Param ApiKey
-       @param PersonId
-       @param MelwinId
-       @return
-       """
+        Set MelwinId for Person
+        @Param ApiKey
+        @param PersonId
+        @param MelwinId
+        @return
+        """
 
         if ApiKey == api.key:
 
             user_resp = requests.get('%s/members/%s' % (get_api_url(), PersonId),
-                                       headers=get_api_headers())
+                                     headers=get_api_headers())
 
             if user_resp.status_code == 200:
                 user = user_resp.json()
@@ -129,15 +144,17 @@ class MelwinService(ServiceBase):
 
                 update_resp = requests.patch('%s/members/%s' % (get_api_url(), user['_id']),
                                              json={'MelwinId': MelwinId},
-                                       headers=user_header)
+                                             headers=user_header)
 
                 print(update_resp.text)
                 print(update_resp.status_code)
 
-                return {'status': 'OK', 'status_code': update_resp.status_code, 'PersonId': PersonId, 'MelwinId': MelwinId}
+                return {'status': 'OK', 'status_code': update_resp.status_code, 'PersonId': PersonId,
+                        'MelwinId': MelwinId}
 
             else:
-                return {'status': 'ERR', 'status_code': user_resp.status_code, 'PersonId': PersonId, 'MelwinId': MelwinId}
+                return {'status': 'ERR', 'status_code': user_resp.status_code, 'PersonId': PersonId,
+                        'MelwinId': MelwinId}
         else:
             return {'status': 'ERR', 'status_code': 403}
 
