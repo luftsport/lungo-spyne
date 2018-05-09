@@ -12,7 +12,7 @@ import api
 class Person(ComplexModel):
     Id = Integer
     MelwinId = Integer
-    Name = Unicode
+    FullName = Unicode
     BirthDate = DateTime
     GenderId = Integer
     GenderText = Unicode
@@ -67,7 +67,7 @@ class MelwinService(ServiceBase):
     def get_members(ApiKey, ClubId, MelwinId=False):
         """
         Members by KL number and if MelwinId or not
-        @Param ApiKey secret API key String
+        @param ApiKey secret API key String
         @param ClubId the club KL number String
         @param MelwinId get users with or without MelwinId True|False
         @return
