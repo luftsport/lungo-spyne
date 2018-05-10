@@ -1,4 +1,12 @@
-from spyne import rpc, srpc, ServiceBase, ComplexModel, Iterable, Integer, Unicode, Boolean, Date, DateTime, Array
+"""
+    Run as:
+    nohup python melwin.py >> spyne.log 2>&1&
+
+"""
+
+from spyne import rpc, srpc, ServiceBase, ComplexModel, Iterable,\
+    Integer, Unicode, Boolean, Date, DateTime, Array, \
+    AnyXml, AnyDict
 
 from spyne.util.simple import wsgi_soap_application
 
@@ -27,6 +35,7 @@ class Person(ComplexModel):
     Created = DateTime
     MongoId = Unicode
     IsActive = Boolean
+    #clubs = Array(Integer)
 
 
 class MelwinUpdated(ComplexModel):
@@ -34,6 +43,31 @@ class MelwinUpdated(ComplexModel):
     status_code = Integer
     PersonId = Integer
     MelwinId = Integer
+
+
+class Org(ComplexModel):
+    Address = Unicode
+    BrregOrgNo = Unicode
+    City = Unicode
+    County = Unicode
+    CountyId = Integer
+    Email = Unicode
+    Id = Integer
+    Name = Unicode
+    NameDescr = Unicode
+    OrgType = Unicode
+    OrgTypeId = Integer
+    Url = Unicode
+    Zip = Unicode
+    _down = Array(Integer)
+    _up = Array(Integer)
+    _updated = DateTime
+    _created = DateTime
+    _etag = Unicode
+    _id = Unicode
+
+
+key = 'NjEzM2Q5Y2VjYmE1NDQ5NDg5ZGJjNzhjYzIwY2FmNGE6'
 
 
 def get_api_key():
@@ -90,7 +124,8 @@ class MelwinService(ServiceBase):
                 melwin_query = ''
 
             if PaymentStatus is not None and isinstance(PaymentStatus, list) and len(PaymentStatus) > 0:
-                melwin_query = '%s,"MemberFeeStatus": {"$in": [%s]}' % (melwin_query, ','.join(str(x) for x in PaymentStatus))
+                melwin_query = '%s,"MemberFeeStatus": {"$in": [%s]}' % (
+                melwin_query, ','.join(str(x) for x in PaymentStatus))
 
             if IsActive is None:
                 pass
@@ -99,7 +134,6 @@ class MelwinService(ServiceBase):
             elif IsActive > 0:
                 melwin_query = '%s,"IsActive":true' % melwin_query
 
-
             club_resp = requests.get('%s/clubs/?where={"NifOrganisationNumber":"%s"}' % (get_api_url(), ClubId),
                                      headers=get_api_headers())
             if club_resp.status_code != 200:
@@ -107,29 +141,29 @@ class MelwinService(ServiceBase):
             else:
                 clubs = club_resp.json()['_items']
 
-                print(clubs)
+                #print(clubs)
 
                 if len(clubs) == 1:
                     club_id = clubs[0]['Id']
 
-            member_resp = requests.get('%s/members/?where={"clubs":{"$in":[%s]}%s}' %
-                                       (get_api_url(), club_id, melwin_query),
-                                       headers=get_api_headers())
+                    member_resp = requests.get('%s/members/?where={"clubs":{"$in":[%s]}%s}' %
+                                               (get_api_url(), club_id, melwin_query),
+                                               headers=get_api_headers())
 
-            if member_resp.status_code != 200:
-                return [{}]
-            else:
-                # print(member_resp.json()['_items'][0])
+                    if member_resp.status_code != 200:
+                        return [{}]
+                    else:
+                        # print(member_resp.json()['_items'][0])
 
-                m = member_resp.json()['_items']
-                for key, value in enumerate(m):  # strptime(modified, '%Y-%m-%dT%H:%M:%S.000Z')
-                    m[key]['BirthDate'] = dateutil.parser.parse(m[key]['BirthDate'])
-                    m[key]['Updated'] = dateutil.parser.parse(m[key]['_updated'])
-                    m[key]['Created'] = dateutil.parser.parse(m[key]['_created'])
-                    m[key]['MongoId'] = m[key]['_id']
-                    # print(m[key])
-                    # exit(0)
-                return m
+                        m = member_resp.json()['_items']
+                        for key, value in enumerate(m):  # strptime(modified, '%Y-%m-%dT%H:%M:%S.000Z')
+                            m[key]['BirthDate'] = dateutil.parser.parse(m[key]['BirthDate'])
+                            m[key]['Updated'] = dateutil.parser.parse(m[key]['_updated'])
+                            m[key]['Created'] = dateutil.parser.parse(m[key]['_created'])
+                            m[key]['MongoId'] = m[key]['_id']
+                            # print(m[key])
+                            # exit(0)
+                        return m
         else:
             return {'status': 'ERR', 'status_code': 403}
 
@@ -158,8 +192,8 @@ class MelwinService(ServiceBase):
                                              json={'MelwinId': MelwinId},
                                              headers=user_header)
 
-                print(update_resp.text)
-                print(update_resp.status_code)
+                #print(update_resp.text)
+                #print(update_resp.status_code)
 
                 return {'status': 'OK', 'status_code': update_resp.status_code, 'PersonId': PersonId,
                         'MelwinId': MelwinId}
@@ -167,6 +201,46 @@ class MelwinService(ServiceBase):
             else:
                 return {'status': 'ERR', 'status_code': user_resp.status_code, 'PersonId': PersonId,
                         'MelwinId': MelwinId}
+        else:
+            return {'status': 'ERR', 'status_code': 403}
+
+    @srpc(Unicode, Integer, Unicode, _returns=Iterable(Org))
+    def get_grener(ApiKey, ClubId, Direction='up'):
+        """
+        Set MelwinId for Person
+        @Param ApiKey Unicode mandatory
+        @param ClubId Integer mandatory
+        @param Direction up or down, default 'up', 'up'|'down'
+        @return
+        """
+
+        if ApiKey == api.key:
+
+            if Direction in ['up', 'down']:
+
+                if Direction == 'up':
+                    Direction = 'down'
+                else:
+                    Direction = 'up'
+                #, "OrgType": "Gruppe for særidrett"
+                url = '%s/orgs?where={"_%s": {"$in": [%s]}}&projection={"_links":0}' % (
+                get_api_url(), Direction, ClubId)
+
+                resp = requests.get(url, headers=get_api_headers())
+
+                if resp.status_code == 200:
+                    ret = resp.json()['_items']
+                    r = []
+                    for k, v in enumerate(ret):
+                        if '_links' in v:
+                            del ret[k]['_links']
+                    #from pprint import pprint
+                    #pprint(ret)
+                    return ret
+                else:
+                    return {'status': 'ERR', 'status_code': resp.status_code, 'Message': resp.text}
+            else:
+                return {'status': 'ERR', 'status_code': 422}
         else:
             return {'status': 'ERR', 'status_code': 403}
 
