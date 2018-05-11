@@ -86,8 +86,24 @@ def get_api_headers():
         'Accept-Encoding': 'gzip, deflate, br'
     }
 
+def get_club_id(kl_id):
+
+    club_resp = requests.get('%s/clubs/?where={"NifOrganisationNumber":"%s"}' % (get_api_url(), kl_id),
+                             headers=get_api_headers())
+
+    if club_resp.status_code != 200:
+        return -1
+    else:
+        clubs = club_resp.json()['_items']
+        if len(clubs) == 1:
+            return int(club_resp.json()['_items'][0]['Id'])
+        else:
+            return -1
 
 class MelwinService(ServiceBase):
+
+
+
     @srpc(Unicode, Integer, _returns=Iterable(Unicode))
     def say_hello(name, numbers):
         """
@@ -134,36 +150,29 @@ class MelwinService(ServiceBase):
             elif IsActive > 0:
                 melwin_query = '%s,"IsActive":true' % melwin_query
 
-            club_resp = requests.get('%s/clubs/?where={"NifOrganisationNumber":"%s"}' % (get_api_url(), ClubId),
-                                     headers=get_api_headers())
-            if club_resp.status_code != 200:
-                return [{}]
+            club_id = get_club_id(ClubId)
+
+            if club_id > 0:
+                member_resp = requests.get('%s/members/?where={"clubs":{"$in":[%s]}%s}' %
+                                           (get_api_url(), club_id, melwin_query),
+                                           headers=get_api_headers())
+
+                if member_resp.status_code != 200:
+                    return [{}]
+                else:
+                    # print(member_resp.json()['_items'][0])
+
+                    m = member_resp.json()['_items']
+                    for key, value in enumerate(m):  # strptime(modified, '%Y-%m-%dT%H:%M:%S.000Z')
+                        m[key]['BirthDate'] = dateutil.parser.parse(m[key]['BirthDate'])
+                        m[key]['Updated'] = dateutil.parser.parse(m[key]['_updated'])
+                        m[key]['Created'] = dateutil.parser.parse(m[key]['_created'])
+                        m[key]['MongoId'] = m[key]['_id']
+                        # print(m[key])
+                        # exit(0)
+                    return m
             else:
-                clubs = club_resp.json()['_items']
-
-                #print(clubs)
-
-                if len(clubs) == 1:
-                    club_id = clubs[0]['Id']
-
-                    member_resp = requests.get('%s/members/?where={"clubs":{"$in":[%s]}%s}' %
-                                               (get_api_url(), club_id, melwin_query),
-                                               headers=get_api_headers())
-
-                    if member_resp.status_code != 200:
-                        return [{}]
-                    else:
-                        # print(member_resp.json()['_items'][0])
-
-                        m = member_resp.json()['_items']
-                        for key, value in enumerate(m):  # strptime(modified, '%Y-%m-%dT%H:%M:%S.000Z')
-                            m[key]['BirthDate'] = dateutil.parser.parse(m[key]['BirthDate'])
-                            m[key]['Updated'] = dateutil.parser.parse(m[key]['_updated'])
-                            m[key]['Created'] = dateutil.parser.parse(m[key]['_created'])
-                            m[key]['MongoId'] = m[key]['_id']
-                            # print(m[key])
-                            # exit(0)
-                        return m
+                return {'status': 'ERR', 'status_code': 404}
         else:
             return {'status': 'ERR', 'status_code': 403}
 
@@ -194,9 +203,12 @@ class MelwinService(ServiceBase):
 
                 #print(update_resp.text)
                 #print(update_resp.status_code)
-
-                return {'status': 'OK', 'status_code': update_resp.status_code, 'PersonId': PersonId,
-                        'MelwinId': MelwinId}
+                if update_resp.status_code == 200:
+                    return {'status': 'OK', 'status_code': update_resp.status_code, 'PersonId': PersonId,
+                            'MelwinId': MelwinId}
+                else:
+                    return {'status': 'ERR', 'status_code': user_resp.status_code, 'PersonId': PersonId,
+                            'MelwinId': MelwinId}
 
             else:
                 return {'status': 'ERR', 'status_code': user_resp.status_code, 'PersonId': PersonId,
@@ -222,8 +234,9 @@ class MelwinService(ServiceBase):
                     Direction = 'down'
                 else:
                     Direction = 'up'
+
                 #, "OrgType": "Gruppe for særidrett"
-                url = '%s/orgs?where={"_%s": {"$in": [%s]}}&projection={"_links":0}' % (
+                url = '%s/orgs?where={"_%s": {"$in": [%s]}}' % (
                 get_api_url(), Direction, ClubId)
 
                 resp = requests.get(url, headers=get_api_headers())
