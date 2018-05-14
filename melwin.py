@@ -231,7 +231,7 @@ class MelwinService(ServiceBase):
                 pass
 
             if PaymentStatus is not None and isinstance(PaymentStatus, list) and len(PaymentStatus) > 0:
-                melwin_query = '%s,"MemberFeeStatus": {"$in": [%s]}' % (melwin_query, ','.join(str(x) for x in PaymentStatus))
+                melwin_query = '%s,"clubs_payment.%s": {"$in": [%s]}' % (melwin_query, club_id, ','.join(str(x) for x in PaymentStatus))
 
 
 
