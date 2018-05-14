@@ -351,7 +351,7 @@ class MelwinService(ServiceBase):
         else:
             return {'status': 'ERR', 'status_code': 403}
 
-    @srpc(Unicode, Integer, Unicode, _returns=LoginResponse)
+    @srpc(Unicode, Unicode, Unicode, _returns=LoginResponse)
     def login_simple(ApiKey, Username, Password):
         """
         Login via NIF Buypass
