@@ -6,15 +6,19 @@
 
 from spyne import rpc, srpc, ServiceBase, ComplexModel, Iterable,\
     Integer, Unicode, Boolean, Date, DateTime, Array, \
-    AnyXml, AnyDict
+    AnyXml, AnyDict, Mandatory, Application
 
-from spyne.util.simple import wsgi_soap_application
+# from spyne.util.simple import wsgi_soap_application
+from spyne.server.wsgi import WsgiApplication
+from spyne.protocol.soap import Soap11
 
 import logging
 import dateutil.parser
 import requests
 import api
+import passbuy
 
+from lxml import etree
 
 # print(spyne._version)PersonID, Etternavn, Fornavn, fødselsdato ,kjønn, epost, mobiltelefon Postadresse, postnummer
 # Takes the return and transforms to
@@ -35,6 +39,8 @@ class Person(ComplexModel):
     Created = DateTime
     MongoId = Unicode
     IsActive = Boolean
+    ClubId = Integer
+    IsActive = Boolean
     #clubs = Array(Integer)
 
 
@@ -44,6 +50,10 @@ class MelwinUpdated(ComplexModel):
     PersonId = Integer
     MelwinId = Integer
 
+class LoginResponse(ComplexModel):
+    Status = Unicode
+    StatusCode = Integer
+    Message = Unicode
 
 class Org(ComplexModel):
     Address = Unicode
@@ -65,6 +75,26 @@ class Org(ComplexModel):
     _created = DateTime
     _etag = Unicode
     _id = Unicode
+
+class PasswordModel(Unicode):
+    #__namespace__ = 'http://docs.oasis-open.org/wss/2004/01/oasis-200401-wss-wssecurity-secext-1.0.xsd'
+    pass
+
+class WSSEAuth(ComplexModel):
+    #__namespace__ = 'http://docs.oasis-open.org/wss/2004/01/oasis-200401-wss-wssecurity-secext-1.0.xsd'
+    Username = Unicode
+    Password = Unicode
+
+class WSSE(ComplexModel):
+    #__namespace__ = 'http://docs.oasis-open.org/wss/2004/01/oasis-200401-wss-wssecurity-secext-1.0.xsd#UsernameToken'
+    UsernameToken = WSSEAuth
+
+class UsernameToken(ComplexModel):
+    UsernameToken = WSSEAuth
+
+class Security(ComplexModel):
+    #__namespace__ = 'http://docs.oasis-open.org/wss/2004/01/oasis-200401-wss-wssecurity-secext-1.0.xsd'
+    UsernameToken = WSSEAuth
 
 
 key = 'NjEzM2Q5Y2VjYmE1NDQ5NDg5ZGJjNzhjYzIwY2FmNGE6'
@@ -100,12 +130,52 @@ def get_club_id(kl_id):
         else:
             return -1
 
+def authenticate(ctx):
+    wss_password = ''
+    wss_username = ''
+    for ngh in ctx.in_header_doc[0].iterdescendants():
+
+        try:
+            key = ngh.tag.split('}')[1]
+
+            if key == 'Password':
+                wss_password = ngh.text
+            elif key == 'Username':
+                wss_username = ngh.text
+        except:
+            pass
+
+    if wss_username == api.username and wss_password == api.password:
+        return True
+
+    return False
+
+def get_credentials(ctx):
+    wss_password = ''
+    wss_username = ''
+
+    for ngh in ctx.in_header_doc[0].iterdescendants():
+
+        try:
+            key = ngh.tag.split('}')[1]
+
+            if key == 'Password':
+                wss_password = ngh.text
+            elif key == 'Username':
+                wss_username = ngh.text
+        except:
+            pass
+
+    return wss_username, wss_password
+
 class MelwinService(ServiceBase):
 
+    __in_header__ = Security
 
 
-    @srpc(Unicode, Integer, _returns=Iterable(Unicode))
-    def say_hello(name, numbers):
+
+    @rpc(Unicode, Integer, _returns=Iterable(Unicode))
+    def say_hello(ctx, name, numbers):
         """
         Say hello!
         <b>Hello hello</b>
@@ -113,6 +183,13 @@ class MelwinService(ServiceBase):
         @param numbers the number of times
         @return the completed array
         """
+        print('HEADERS')
+        a = [txt.strip() for txt in ctx.in_header_doc[0].itertext()]
+        print(a)
+        print('Auth result: %s' % authenticate(ctx))
+        print('/HEADERS')
+        #root = etree.fromstring(ctx.in_header_doc)
+        #etree.tostring(root)
 
         return u'Hello, %s' % name
 
@@ -130,31 +207,39 @@ class MelwinService(ServiceBase):
 
         if ApiKey == api.key:
 
+            club_id = get_club_id(ClubId)
+            melwin_query = ''
+
+            if IsActive == 0 or IsActive is None:
+                melwin_query = '"$or":[{"clubs_active": {"$in": [%s]}},{"clubs_inactive": {"$in": [%s]}}]' % (
+                    club_id, club_id)
+            elif IsActive < 0:
+                melwin_query = '"clubs_inactive": {"$in": [%s]}' % (
+                    club_id)
+            elif IsActive > 0:
+                melwin_query = '"clubs_active": {"$in": [%s]}' % (
+                    club_id)
+
+
             if MelwinId is None:
-                melwin_query = ''
+                pass
             elif MelwinId < 0:
-                melwin_query = ',"MelwinId":null'
+                melwin_query = '%s,"MelwinId":null' % melwin_query
             elif MelwinId > 0:
-                melwin_query = ',"MelwinId":{"$ne":null}'
+                melwin_query = '%s,"MelwinId":{"$ne":null}' % melwin_query
             else:
-                melwin_query = ''
+                pass
 
             if PaymentStatus is not None and isinstance(PaymentStatus, list) and len(PaymentStatus) > 0:
-                melwin_query = '%s,"MemberFeeStatus": {"$in": [%s]}' % (
-                melwin_query, ','.join(str(x) for x in PaymentStatus))
+                melwin_query = '%s,"MemberFeeStatus": {"$in": [%s]}' % (melwin_query, ','.join(str(x) for x in PaymentStatus))
 
-            if IsActive is None:
-                pass
-            elif IsActive < 0:
-                melwin_query = '%s,"IsActive":false' % melwin_query
-            elif IsActive > 0:
-                melwin_query = '%s,"IsActive":true' % melwin_query
 
-            club_id = get_club_id(ClubId)
+
+
 
             if club_id > 0:
-                member_resp = requests.get('%s/members/?where={"clubs":{"$in":[%s]}%s}' %
-                                           (get_api_url(), club_id, melwin_query),
+                member_resp = requests.get('%s/members/?where={%s}' %
+                                           (get_api_url(), melwin_query),
                                            headers=get_api_headers())
 
                 if member_resp.status_code != 200:
@@ -168,6 +253,15 @@ class MelwinService(ServiceBase):
                         m[key]['Updated'] = dateutil.parser.parse(m[key]['_updated'])
                         m[key]['Created'] = dateutil.parser.parse(m[key]['_created'])
                         m[key]['MongoId'] = m[key]['_id']
+
+                        # Assign new virtual
+                        m[key]['ClubId'] = club_id
+
+                        if club_id in m[key]['clubs_active']:
+                            m[key]['IsActive'] = True
+                        elif club_id in m[key]['clubs_inactive']:
+                            m[key]['IsActive'] = False
+
                         # print(m[key])
                         # exit(0)
                     return m
@@ -257,6 +351,50 @@ class MelwinService(ServiceBase):
         else:
             return {'status': 'ERR', 'status_code': 403}
 
+    @srpc(Unicode, Integer, Unicode, _returns=LoginResponse)
+    def login_simple(ApiKey, Username, Password):
+        """
+        Login via NIF Buypass
+        @Param ApiKey Unicode mandatory
+        @param Username Integer mandatory
+        @param Password
+        @return
+        """
+        pb = passbuy.passbuy(username=Username, password=Password)
+
+        try:
+            fed_cookie = pb.login()
+        except AttributeError:
+            return {'Message': 'Wrong password or user', 'Status': 'ERR', 'StatusCode': 401}
+        except Exception as e:
+            return {'Message': 'Wrong password or user', 'Status': 'ERR', 'StatusCode': 401}
+
+        if fed_cookie:
+            import requests
+            if isinstance(fed_cookie, requests.cookies.RequestsCookieJar):
+                return {'Message': 'Success', 'Status': 'OK', 'StatusCode': 200}
+
+    @rpc(Unicode, _returns=LoginResponse)
+    def login(ctx, ApiKey):
+        """
+        Login via NIF Buypass WSSE header
+        @Param ApiKey Unicode mandatory
+        @return
+        """
+        Username, Password = get_credentials(ctx)
+        pb = passbuy.passbuy(username=Username, password=Password)
+
+        try:
+            fed_cookie = pb.login()
+        except AttributeError:
+            return {'Message': 'Wrong password or user', 'Status': 'ERR', 'StatusCode': 401}
+        except Exception as e:
+            return {'Message': 'Wrong password or user', 'Status': 'ERR', 'StatusCode': 401}
+
+        if fed_cookie:
+            import requests
+            if isinstance(fed_cookie, requests.cookies.RequestsCookieJar):
+                return {'Message': 'Success', 'Status': 'OK', 'StatusCode': 200}
 
 if __name__ == '__main__':
     from wsgiref.simple_server import make_server
@@ -267,6 +405,8 @@ if __name__ == '__main__':
     logging.info("listening to http://127.0.0.1:8000")
     logging.info("wsdl is at: http://localhost:8000/?wsdl")
 
-    wsgi_app = wsgi_soap_application([MelwinService], 'spyne.melwin.soap')
+    #wsgi_app = wsgi_soap_application([MelwinService], 'spyne.melwin.soap')
+    app = Application([MelwinService], tns='spyne.melwin.soap', in_protocol=Soap11(validator='lxml'), out_protocol=Soap11())
+    wsgi_app = WsgiApplication(app)
     server = make_server('127.0.0.1', 8000, wsgi_app)
     server.serve_forever()
