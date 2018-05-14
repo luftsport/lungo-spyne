@@ -22,6 +22,7 @@ from lxml import etree
 class ClubsPayment(ComplexModel):
     ClubId = Integer
     PaymentStatus = Integer
+    Active = Boolean
 
 # print(spyne._version)PersonID, Etternavn, Fornavn, fødselsdato ,kjønn, epost, mobiltelefon Postadresse, postnummer
 # Takes the return and transforms to
