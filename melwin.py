@@ -19,6 +19,9 @@ import api
 import passbuy
 
 from lxml import etree
+class ClubsPayment(ComplexModel):
+    ClubId = Integer
+    PaymentStatus = Integer
 
 # print(spyne._version)PersonID, Etternavn, Fornavn, fødselsdato ,kjønn, epost, mobiltelefon Postadresse, postnummer
 # Takes the return and transforms to
@@ -41,6 +44,7 @@ class Person(ComplexModel):
     IsActive = Boolean
     ClubId = Integer
     IsActive = Boolean
+    clubs_payment = Array(ClubsPayment)
     #clubs = Array(Integer)
 
 
@@ -231,10 +235,8 @@ class MelwinService(ServiceBase):
                 pass
 
             if PaymentStatus is not None and isinstance(PaymentStatus, list) and len(PaymentStatus) > 0:
-                melwin_query = '%s,"clubs_payment.%s": {"$in": [%s]}' % (melwin_query, club_id, ','.join(str(x) for x in PaymentStatus))
-
-
-
+                melwin_query = '%s,{"$and": [{"clubs_payment.ClubId": %s}, {"clubs_payment.PaymentStatus": {"$in": [%s]}}]}' % \
+                               (melwin_query, club_id, ','.join(str(x) for x in PaymentStatus))
 
 
             if club_id > 0:
