@@ -24,6 +24,15 @@ class ClubsPayment(ComplexModel):
     PaymentStatus = Integer
     Active = Boolean
 
+class Activity(ComplexModel):
+    ClubId = Integer
+    Name = Unicode
+    OrgId = Integer
+    OrgTypeId = Integer
+    OrgTypeName = Unicode
+    IsPassive = Boolean
+    FunctionId = Integer
+
 # print(spyne._version)PersonID, Etternavn, Fornavn, fødselsdato ,kjønn, epost, mobiltelefon Postadresse, postnummer
 # Takes the return and transforms to
 class Person(ComplexModel):
@@ -46,6 +55,8 @@ class Person(ComplexModel):
     ClubId = Integer
     PaymentStatus = Integer
 
+    Gren = Array(Activity)
+    activities = Array(Activity)
     clubs_payment = Array(ClubsPayment)
     #clubs = Array(Integer)
 
@@ -281,6 +292,23 @@ class MelwinService(ServiceBase):
 
                         # Assign new virtual
                         m[key]['ClubId'] = club_id
+
+                        # Activities!!!
+                        if 'activities' in m[key]:
+
+                            if 'Gren' not in m[key]:
+                                m[key]['Gren'] = []
+
+                            for a in m[key]['activities']:
+                                #print(a['ClubId'])
+                                if int(a['ClubId']) == int(club_id) and int(a['OrgTypeId']) == 14:
+                                    m[key]['Gren'].append({'ClubId': a['ClubId'],
+                                                           'Name': a['ShortName'],
+                                                           'OrgId': a['OrgId'],
+                                                           'OrgTypeId': a['OrgTypeId'],
+                                                           'OrgTypeName': a['OrgTypeName'],
+                                                           'IsPassive': a['IsPassive'],
+                                                           'FunctionId': a['FunctionId']})
 
                         #IsActive = Boolean
                         #ClubId = Integer
