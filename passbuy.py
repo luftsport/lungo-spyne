@@ -3,10 +3,30 @@ from bs4 import BeautifulSoup
 import base64
 import json
 
+class Error(Exception):
+    """Base class for exceptions in this module."""
+    pass
+
+class InputError(Error):
+    """Exception raised for errors in the input.
+
+    Attributes:
+        expression -- input expression in which the error occurred
+        message -- explanation of the error
+    """
+
+    def __init__(self, expression, message):
+        self.expression = expression
+        self.message = message
+
 class passbuy:
 
-    def __init__(self, username, password):
+    def __init__(self, realm, username, password):
 
+        if realm not in ['ka.nif.no', 'mi.nif.no']:
+            raise InputError('Not in list', 'Only valid nif realms allowed like ka.nif.no')
+
+        self.realm = realm
         self.username = username
         self.password = password
 
@@ -20,12 +40,12 @@ class passbuy:
 
     def get_nif_signin(self):
 
-        signin_url = 'https://sts.nif.no/Account/SignIn?ReturnUrl=https%3a%2f%2fsts.nif.no%2fissue%2fwsfed%3fwa%3dwsignin1.0%26wtrealm%3dhttps%253a%252f%252fka.nif.no%252f%26wctx%3drm%253d0%2526id%253dpassive%2526ru%253d%252f'
+        signin_url = 'https://sts.nif.no/Account/SignIn?ReturnUrl=https%3a%2f%2fsts.nif.no%2fissue%2fwsfed%3fwa%3dwsignin1.0%26wtrealm%3dhttps%253a%252f%252f{}%252f%26wctx%3drm%253d0%2526id%253dpassive%2526ru%253d%252f'.format(self.realm)
         self.signin = requests.get(signin_url, headers={'Accept': self.accept,
                                                    'Accept-Encoding': self.accept_encoding,
                                                    'Cache-Control': 'max-age=0',
                                                    'User-Agent': self.user_agent,
-                                                   'Referer': 'https://ka.nif.no/',
+                                                   'Referer': 'https://%s/' % self.realm,
                                                    'Cookie': 'cookieconsent=yes',
                                                    'Host': 'sts.nif.no',
                                                    'Upgrade-Insecure-Requests': '1'
@@ -40,7 +60,7 @@ class passbuy:
 
         self.get_nif_signin()
 
-        login_url = 'https://sts.nif.no/Account/BuypassLogin?returnUrl=https%3a%2f%2fsts.nif.no%2fissue%2fwsfed%3fwa%3dwsignin1.0%26wtrealm%3dhttps%253a%252f%252fka.nif.no%252f%26wctx%3drm%253d0%2526id%253dpassive%2526ru%253d%252f'
+        login_url = 'https://sts.nif.no/Account/BuypassLogin?returnUrl=https%3a%2f%2fsts.nif.no%2fissue%2fwsfed%3fwa%3dwsignin1.0%26wtrealm%3dhttps%253a%252f%252f{}%252f%26wctx%3drm%253d0%2526id%253dpassive%2526ru%253d%252f'.format(self.realm)
         login = requests.get(login_url, cookies=self.signin.cookies, headers={'User-Agent': self.user_agent})
 
         login_html = BeautifulSoup(login.text, 'lxml')
@@ -62,7 +82,7 @@ class passbuy:
                                     'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
                                     'Accept-Encoding': 'gzip, deflate, br',
                                     'Host': 'secure.buypass.no',
-                                    'Referer': 'https://sts.nif.no/Account/BuypassLogin?returnUrl=https%253a%252f%252fsts.nif.no%252fissue%252fwsfed%253fwa%253dwsignin1.0%2526wtrealm%253dhttps%25253a%25252f%25252fka.nif.no%25252f%2526wctx%253drm%25253d0%252526id%25253dpassive%252526ru%25253d%25252f',
+                                    'Referer': 'https://sts.nif.no/Account/BuypassLogin?returnUrl=https%253a%252f%252fsts.nif.no%252fissue%252fwsfed%253fwa%253dwsignin1.0%2526wtrealm%253dhttps%25253a%25252f%25252f{}%25252f%2526wctx%253drm%25253d0%252526id%25253dpassive%252526ru%25253d%25252f'.format(self.realm),
                                     'Upgrade-Insecure-Requests': '1',
                                     'User-Agent': self.user_agent})
 
@@ -166,7 +186,7 @@ class passbuy:
                                  },
                            headers={'Accept': self.accept,
                                     'Accept-Encoding': self.accept_encoding,
-                                    'Host': 'ka.nif.no',
+                                    'Host': self.realm,
                                     'Referer': id_response_location,
                                     'Upgrade-Insecure-Requests': '1',
                                     'User-Agent': self.user_agent

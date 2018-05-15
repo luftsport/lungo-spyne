@@ -44,7 +44,6 @@ class Person(ComplexModel):
     MongoId = Unicode
     IsActive = Boolean
     ClubId = Integer
-    IsActive = Boolean
     clubs_payment = Array(ClubsPayment)
     #clubs = Array(Integer)
 
@@ -354,8 +353,8 @@ class MelwinService(ServiceBase):
         else:
             return {'status': 'ERR', 'status_code': 403}
 
-    @srpc(Unicode, Unicode, Unicode, _returns=LoginResponse)
-    def login_simple(ApiKey, Username, Password):
+    @srpc(Unicode, Unicode, Unicode, Unicode, _returns=LoginResponse)
+    def login_simple(ApiKey, Username, Password, Realm='mi.nif.no'):
         """
         Login via NIF Buypass
         @Param ApiKey Unicode mandatory
@@ -363,8 +362,7 @@ class MelwinService(ServiceBase):
         @param Password
         @return
         """
-        pb = passbuy.passbuy(username=Username, password=Password)
-
+        pb = passbuy.passbuy(realm=Realm, username=Username, password=Password)
         try:
             fed_cookie = pb.login()
         except AttributeError:
@@ -377,15 +375,15 @@ class MelwinService(ServiceBase):
             if isinstance(fed_cookie, requests.cookies.RequestsCookieJar):
                 return {'Message': 'Success', 'Status': 'OK', 'StatusCode': 200}
 
-    @rpc(Unicode, _returns=LoginResponse)
-    def login(ctx, ApiKey):
+    @rpc(Unicode, Unicode, _returns=LoginResponse)
+    def login(ctx, ApiKey, Realm='mi.nif.no'):
         """
         Login via NIF Buypass WSSE header
         @Param ApiKey Unicode mandatory
         @return
         """
         Username, Password = get_credentials(ctx)
-        pb = passbuy.passbuy(username=Username, password=Password)
+        pb = passbuy.passbuy(realm=Realm, username=Username, password=Password)
 
         try:
             fed_cookie = pb.login()
