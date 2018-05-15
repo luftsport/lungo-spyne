@@ -237,10 +237,11 @@ class MelwinService(ServiceBase):
                 pass
 
             if PaymentStatus is not None and isinstance(PaymentStatus, list) and len(PaymentStatus) > 0:
-                melwin_query = '%s,{"$and": [{"clubs_payment.ClubId": %s}, {"clubs_payment.PaymentStatus": {"$in": [%s]}}]}' % \
+                melwin_query = '%s,"$and": [{"clubs_payment.ClubId": %s}, {"clubs_payment.PaymentStatus": {"$in": [%s]}}]' % \
                                (melwin_query, club_id, ','.join(str(x) for x in PaymentStatus))
-
-
+            # Corrected example:
+            # {"$or": [{"clubs_active": {"$in": [22976]}}, {"clubs_inactive": {"$in": [22976]}}],
+            # "$and": [{"clubs_payment.ClubId": 22976}, {"clubs_payment.PaymentStatus": {"$in": [0]}}]}
             if club_id > 0:
                 member_resp = requests.get('%s/members/?where={%s}' %
                                            (get_api_url(), melwin_query),
