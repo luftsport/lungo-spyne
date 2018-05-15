@@ -38,12 +38,14 @@ class Person(ComplexModel):
     Address = Unicode
     PostNumber = Unicode
     City = Unicode
-    MemberFeeStatus = Integer
     Updated = DateTime
     Created = DateTime
     MongoId = Unicode
+
     IsActive = Boolean
     ClubId = Integer
+    PaymentStatus = Integer
+
     clubs_payment = Array(ClubsPayment)
     #clubs = Array(Integer)
 
@@ -259,12 +261,20 @@ class MelwinService(ServiceBase):
                         # Assign new virtual
                         m[key]['ClubId'] = club_id
 
+                        #IsActive = Boolean
+                        #ClubId = Integer
+                        #PaymentStatus = Integer
                         if club_id in m[key]['clubs_active']:
                             m[key]['IsActive'] = True
                         elif club_id in m[key]['clubs_inactive']:
                             m[key]['IsActive'] = False
 
-                        # print(m[key])
+                        if 'clubs_payment' in m[key]:
+                            for k, v in enumerate(m[key]['clubs_payment']):
+                                if int(v['ClubId']) == int(club_id):
+                                    m[key]['PaymentStatus'] = v['PaymentStatus']
+                                    break
+                                    # print(m[key])
                         # exit(0)
                     return m
             else:
