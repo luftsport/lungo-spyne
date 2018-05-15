@@ -37,6 +37,8 @@ class passbuy:
 
         self.signin = None
 
+        self.federation = None
+
 
     def get_nif_signin(self):
 
@@ -193,8 +195,32 @@ class passbuy:
                                     },
                            allow_redirects=False
                            )
+        self.federation = ka.cookies
 
         return ka.cookies
+
+    def get_id_from_profile(self):
+        """Logs in and parses out NIF id from profile in MI"""
+
+        # Test for realm etc
+        if self.federation is None:
+            self.login()
+
+
+        import requests, bs4
+
+        profile = requests.get('https://mi.nif.no/MyProfile/Profiles', cookies=self.federation)
+
+        soup = bs4.BeautifulSoup(profile.text, 'lxml')
+
+        profile_img_id = soup.find(alt='Profilbilde')['id']
+
+        nif_id = int(profile_img_id.split('_')[1])
+
+        return nif_id
+
+
+
 
     def login(self):
 

@@ -60,6 +60,8 @@ class LoginResponse(ComplexModel):
     Status = Unicode
     StatusCode = Integer
     Message = Unicode
+    MelwinId = Integer
+    PersonId = Integer
 
 class Org(ComplexModel):
     Address = Unicode
@@ -173,6 +175,20 @@ def get_credentials(ctx):
             pass
 
     return wss_username, wss_password
+
+def get_melwin_id(person_id):
+
+    r = requests.get('%s/members/%s?projection={"Id":1, "MelwinId": 1}'
+                     % (get_api_url(), person_id),
+                     headers=get_api_headers())
+    if r.status_code == 200:
+        print(r.json())
+        return r.json()['MelwinId']
+        # data = r.json()
+        # return data['Id'], data['MelwinId']
+
+    else:
+        return None
 
 class MelwinService(ServiceBase):
 
@@ -368,6 +384,7 @@ class MelwinService(ServiceBase):
         else:
             return {'status': 'ERR', 'status_code': 403}
 
+
     @srpc(Unicode, Unicode, Unicode, Unicode, _returns=LoginResponse)
     def login_simple(ApiKey, Username, Password, Realm='mi.nif.no'):
         """
@@ -377,6 +394,10 @@ class MelwinService(ServiceBase):
         @param Password
         @return
         """
+
+        person_id = None
+        melwin_id = None
+
         pb = passbuy.passbuy(realm=Realm, username=Username, password=Password)
         try:
             fed_cookie = pb.login()
@@ -386,9 +407,13 @@ class MelwinService(ServiceBase):
             return {'Message': 'Wrong password or user', 'Status': 'ERR', 'StatusCode': 401}
 
         if fed_cookie:
-            import requests
             if isinstance(fed_cookie, requests.cookies.RequestsCookieJar):
-                return {'Message': 'Success', 'Status': 'OK', 'StatusCode': 200}
+                person_id = pb.get_id_from_profile()
+                melwin_id = get_melwin_id(person_id)
+                return {'Message': 'Success', 'Status': 'OK', 'StatusCode': 200, 'MelwinId': melwin_id, 'PersonId': person_id}
+            else:
+                return {'Message': 'Success', 'Status': 'OK', 'StatusCode': 200, 'MelwinId': None,
+                            'PersonId': None}
 
     @rpc(Unicode, Unicode, _returns=LoginResponse)
     def login(ctx, ApiKey, Realm='mi.nif.no'):
@@ -408,7 +433,6 @@ class MelwinService(ServiceBase):
             return {'Message': 'Wrong password or user', 'Status': 'ERR', 'StatusCode': 401}
 
         if fed_cookie:
-            import requests
             if isinstance(fed_cookie, requests.cookies.RequestsCookieJar):
                 return {'Message': 'Success', 'Status': 'OK', 'StatusCode': 200}
 
