@@ -304,7 +304,7 @@ class MelwinService(ServiceBase):
                                 # Only Grener OrgId == 14
                                 if int(a['ClubId']) == int(club_id) and int(a['OrgTypeId']) == 14:
                                     m[key]['Gren'].append({'ClubId': a['ClubId'],
-                                                           'Name': a['ShortName'],
+                                                           'ShortName': a['ShortName'],
                                                            'OrgId': a['OrgId'],
                                                            'OrgTypeId': a['OrgTypeId'],
                                                            'OrgTypeName': a['OrgTypeName'],
