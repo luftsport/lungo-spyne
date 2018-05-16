@@ -26,7 +26,7 @@ class ClubsPayment(ComplexModel):
 
 class Activity(ComplexModel):
     ClubId = Integer
-    Name = Unicode
+    ShortName = Unicode
     OrgId = Integer
     OrgTypeId = Integer
     OrgTypeName = Unicode
@@ -284,7 +284,9 @@ class MelwinService(ServiceBase):
                     # print(member_resp.json()['_items'][0])
 
                     m = member_resp.json()['_items']
+
                     for key, value in enumerate(m):  # strptime(modified, '%Y-%m-%dT%H:%M:%S.000Z')
+
                         m[key]['BirthDate'] = dateutil.parser.parse(m[key]['BirthDate'])
                         m[key]['Updated'] = dateutil.parser.parse(m[key]['_updated'])
                         m[key]['Created'] = dateutil.parser.parse(m[key]['_created'])
@@ -292,15 +294,14 @@ class MelwinService(ServiceBase):
 
                         # Assign new virtual
                         m[key]['ClubId'] = club_id
+                        m[key]['Gren'] = []
 
                         # Activities!!!
                         if 'activities' in m[key]:
 
-                            if 'Gren' not in m[key]:
-                                m[key]['Gren'] = []
-
                             for a in m[key]['activities']:
-                                #print(a['ClubId'])
+
+                                # Only Grener OrgId == 14
                                 if int(a['ClubId']) == int(club_id) and int(a['OrgTypeId']) == 14:
                                     m[key]['Gren'].append({'ClubId': a['ClubId'],
                                                            'Name': a['ShortName'],
