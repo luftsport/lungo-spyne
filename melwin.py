@@ -33,6 +33,26 @@ class Activity(ComplexModel):
     IsPassive = Boolean
     FunctionId = Integer
 
+class Magazine(ComplexModel):
+    Name = Unicode
+    ProductDetailId = Integer
+    Selected = Boolean
+
+class Magazines(ComplexModel):
+    ClubOrgId = Integer
+    ClubName = Unicode
+    Details = Array(Magazine)
+
+class Product(ComplexModel):
+    Name = Unicode
+    ProductDetailId = Integer
+    Selected = Boolean
+
+class Products(ComplexModel):
+    ClubOrgId = Integer
+    ClubName = Unicode
+    Details = Array(Product)
+
 # print(spyne._version)PersonID, Etternavn, Fornavn, fødselsdato ,kjønn, epost, mobiltelefon Postadresse, postnummer
 # Takes the return and transforms to
 class Person(ComplexModel):
@@ -58,6 +78,8 @@ class Person(ComplexModel):
     Gren = Array(Activity)
     activities = Array(Activity)
     clubs_payment = Array(ClubsPayment)
+    Magazines = Array(Magazines)
+    Products = Array(Products)
     #clubs = Array(Integer)
 
 
