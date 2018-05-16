@@ -265,7 +265,8 @@ class MelwinService(ServiceBase):
 
             if PaymentStatus is not None and isinstance(PaymentStatus, list) and len(PaymentStatus) > 0:
                 melwin_query = '%s,\
-                "$and": [{"clubs_payment": {"$elemMatch": {"ClubId": %s}}}, {"clubs_payment": {"$elemMatch": {"PaymentStatus": {"$in": [%s]}}}}]' % (melwin_query, club_id, ','.join(str(x) for x in PaymentStatus))
+                "clubs_payment": {"$elemMatch": {"ClubId": %s, "PaymentStatus": {"$in": [%s]} } } ' % (melwin_query, club_id, ','.join(str(x) for x in PaymentStatus))
+                # "$and": [{"clubs_payment": {"$elemMatch": {"ClubId": %s}}}, {"clubs_payment": {"$elemMatch": {"PaymentStatus": {"$in": [%s]}}}}]' % (melwin_query, club_id, ','.join(str(x) for x in PaymentStatus))
                 #$and: [{"clubs_payment": {"$elemMatch": {"ClubId": %s}}}, {"clubs_payment": {"$elemMatch": {"PaymentStatus": {"$in": [%s]}}}}]' % (melwin_query, club_id, ','.join(str(x) for x in PaymentStatus))
 
             # old melwin_query = '%s,"$and": [{"clubs_payment.ClubId": %s}, {"clubs_payment.PaymentStatus": {"$in": [%s]}}]' % \
