@@ -137,10 +137,6 @@ class Security(ComplexModel):
     #__namespace__ = 'http://docs.oasis-open.org/wss/2004/01/oasis-200401-wss-wssecurity-secext-1.0.xsd'
     UsernameToken = WSSEAuth
 
-
-key = 'NjEzM2Q5Y2VjYmE1NDQ5NDg5ZGJjNzhjYzIwY2FmNGE6'
-
-
 def get_api_key():
     return 'Basic %s' % api.key
 
