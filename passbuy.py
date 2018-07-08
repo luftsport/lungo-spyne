@@ -23,8 +23,16 @@ class passbuy:
 
     def __init__(self, realm, username, password):
 
-        if realm not in ['ka.nif.no', 'mi.nif.no']:
+        if realm not in ['ka.nif.no', 'mi.nif.no', 'kadst.nif.no']:
             raise InputError('Not in list', 'Only valid nif realms allowed like ka.nif.no')
+
+
+        if realm == 'kadst.nif.no':
+            self.sts = 'stsdst'
+            self.buypass_host = 'secure.test4.buypass.no'
+        else:
+            self.sts = 'sts'
+            self.buypass_host= 'secure.buypass.no'
 
         self.realm = realm
         self.username = username
@@ -42,14 +50,14 @@ class passbuy:
 
     def get_nif_signin(self):
 
-        signin_url = 'https://sts.nif.no/Account/SignIn?ReturnUrl=https%3a%2f%2fsts.nif.no%2fissue%2fwsfed%3fwa%3dwsignin1.0%26wtrealm%3dhttps%253a%252f%252f{}%252f%26wctx%3drm%253d0%2526id%253dpassive%2526ru%253d%252f'.format(self.realm)
+        signin_url = 'https://{0}.nif.no/Account/SignIn?ReturnUrl=https%3a%2f%2f{0}.nif.no%2fissue%2fwsfed%3fwa%3dwsignin1.0%26wtrealm%3dhttps%253a%252f%252f{1}%252f%26wctx%3drm%253d0%2526id%253dpassive%2526ru%253d%252f'.format(self.sts, self.realm)
         self.signin = requests.get(signin_url, headers={'Accept': self.accept,
                                                    'Accept-Encoding': self.accept_encoding,
                                                    'Cache-Control': 'max-age=0',
                                                    'User-Agent': self.user_agent,
                                                    'Referer': 'https://%s/' % self.realm,
                                                    'Cookie': 'cookieconsent=yes',
-                                                   'Host': 'sts.nif.no',
+                                                   'Host': '{0}.nif.no'.format(self.sts),
                                                    'Upgrade-Insecure-Requests': '1'
                                                    }
                               )
@@ -62,7 +70,7 @@ class passbuy:
 
         self.get_nif_signin()
 
-        login_url = 'https://sts.nif.no/Account/BuypassLogin?returnUrl=https%3a%2f%2fsts.nif.no%2fissue%2fwsfed%3fwa%3dwsignin1.0%26wtrealm%3dhttps%253a%252f%252f{}%252f%26wctx%3drm%253d0%2526id%253dpassive%2526ru%253d%252f'.format(self.realm)
+        login_url = 'https://{0}.nif.no/Account/BuypassLogin?returnUrl=https%3a%2f%2f{0}.nif.no%2fissue%2fwsfed%3fwa%3dwsignin1.0%26wtrealm%3dhttps%253a%252f%252f{1}%252f%26wctx%3drm%253d0%2526id%253dpassive%2526ru%253d%252f'.format(self.sts, self.realm)
         login = requests.get(login_url, cookies=self.signin.cookies, headers={'User-Agent': self.user_agent})
 
         login_html = BeautifulSoup(login.text, 'lxml')
@@ -75,27 +83,30 @@ class passbuy:
         return PSE, E, M, op
 
     def post_buypass_form(self):
+        """Gets the buypass web form"""
 
         PSE, E, M, op = self.get_nif_login()
 
-        bp_form_url = 'https://secure.buypass.no/wips/service'
-        bp_form = requests.post(bp_form_url, data={'PSE': PSE, 'E': E, 'M': M, 'op': op},
+        
+
+        bp_form = requests.post('https://{0}/wips/service'.format(self.buypass_host), data={'PSE': PSE, 'E': E, 'M': M, 'op': op},
                                 headers={
                                     'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
                                     'Accept-Encoding': 'gzip, deflate, br',
-                                    'Host': 'secure.buypass.no',
-                                    'Referer': 'https://sts.nif.no/Account/BuypassLogin?returnUrl=https%253a%252f%252fsts.nif.no%252fissue%252fwsfed%253fwa%253dwsignin1.0%2526wtrealm%253dhttps%25253a%25252f%25252f{}%25252f%2526wctx%253drm%25253d0%252526id%25253dpassive%252526ru%25253d%25252f'.format(self.realm),
+                                    'Host': self.buypass_host,
+                                    'Referer': 'https://{0}.nif.no/Account/BuypassLogin?returnUrl=https%253a%252f%252f{0}.nif.no%252fissue%252fwsfed%253fwa%253dwsignin1.0%2526wtrealm%253dhttps%25253a%25252f%25252f{1}%25252f%2526wctx%253drm%25253d0%252526id%25253dpassive%252526ru%25253d%25252f'.format(self.sts, self.realm),
                                     'Upgrade-Insecure-Requests': '1',
                                     'User-Agent': self.user_agent})
 
         bp_form_html = BeautifulSoup(bp_form.text, 'lxml')
-        bp_form_action = 'https://secure.buypass.no%s' % \
-                         bp_form_html.find('form', attrs={'id': 'otpform'}).get_attribute_list('action')[0]
+        bp_form_action = 'https://{0}{1}'.format(self.buypass_host,
+                         bp_form_html.find('form', attrs={'id': 'otpform'}).get_attribute_list('action')[0])
         bp_form_ch = bp_form_html.find('input', attrs={'id': 'ch'}).get_attribute_list('value')[0]
 
         return bp_form_action, bp_form_ch, bp_form
 
     def post_buypass_auth(self):
+        """Now we post the values from the login form"""
 
         bp_form_action, bp_form_ch, bp_form = self.post_buypass_form()
 
@@ -109,13 +120,13 @@ class passbuy:
                                       'flag': None,
                                       'password': hhash.hexdigest().upper(),
                                       'passwordinput': '',
-                                      'username': '%s' % self.username},
-                                      # cookies=bp_form.cookies,
+                                      'username': self.username},
+                                      cookies=bp_form.cookies,
                                 headers={  # 'Cookie': 'JSESSIONID=%s' % bp_form.cookies['JSESSIONID'],
                                     'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
                                     'Accept-Encoding': 'gzip, deflate, br',
-                                    'Host': 'secure.buypass.no',
-                                    'Referer': 'https://secure.buypass.no/wips/service',
+                                    #'Host': self.buypass_host,
+                                    'Referer': 'https://{0}/wips/service'.format(self.buypass_host),
                                     'Upgrade-Insecure-Requests': '1',
                                     'User-Agent': self.user_agent})
 
@@ -123,9 +134,10 @@ class passbuy:
         bp_auth_action = bp_auth_html.find('form', attrs={'id': 'fwForm'}).get_attribute_list('action')[0]
         bp_auth_PE = bp_auth_html.find('input', attrs={'name': 'PE'}).get_attribute_list('value')[0]
 
-        # Remove jsessionid - again
-        t = bp_form_action.split(';jsessionid=%s' % bp_form.cookies['JSESSIONID'])
-        bp_form_action = '%s%s' % (t[0], t[1])
+
+        # Remove jsessionid - again - DO NOT need in referer!
+        #t = bp_form_action.split(';jsessionid=%s' % bp_form.cookies['JSESSIONID'])
+        #bp_form_action = '%s%s' % (t[0], t[1])
 
         return bp_auth_action, bp_form_action, bp_auth_PE
 
@@ -137,7 +149,7 @@ class passbuy:
                                     headers={  # 'Cookie': cookie,
                                         'Accept': self.accept,
                                         'Accept-Encoding': self.accept_encoding,
-                                        'Host': 'sts.nif.no',
+                                        'Host': '{0}.nif.no'.format(self.sts),
                                         'Referer': bp_form_action,
                                         'Upgrade-Insecure-Requests': '1',
                                         'User-Agent': self.user_agent
@@ -159,7 +171,7 @@ class passbuy:
                               cookies=id_response.cookies,
                               headers={'Accept': self.accept,
                                        'Accept-Encoding': self.accept_encoding,
-                                       'Host': 'sts.nif.no',
+                                       'Host': '{0}.nif.no'.format(self.sts),
                                        'Referer': bp_form_action,
                                        'Upgrade-Insecure-Requests': '1',
                                        'User-Agent': self.user_agent
@@ -200,7 +212,8 @@ class passbuy:
         return ka.cookies
 
     def get_id_from_profile(self):
-        """Logs in and parses out NIF id from profile in MI"""
+        """Logs in and parses out NIF id from profile in MI
+        @TODO: without profilbilde it fails..."""
 
         # Test for realm etc
         if self.federation is None:
