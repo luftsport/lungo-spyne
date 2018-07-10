@@ -256,7 +256,7 @@ class MelwinService(ServiceBase):
         @return
         """
 
-        if ApiKey == api.key:
+        if ApiKey == api.key_melwin:
 
             club_id = get_club_id(ClubId)
             melwin_query = ''
@@ -361,7 +361,7 @@ class MelwinService(ServiceBase):
         @return
         """
 
-        if ApiKey == api.key:
+        if ApiKey == api.key_melwin:
 
             user_resp = requests.get('%s/members/%s' % (get_api_url(), PersonId),
                                      headers=get_api_headers())
@@ -401,7 +401,7 @@ class MelwinService(ServiceBase):
         @return
         """
 
-        if ApiKey == api.key:
+        if ApiKey == api.key_melwin:
 
             if Direction in ['up', 'down']:
 
