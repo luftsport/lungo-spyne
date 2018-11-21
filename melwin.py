@@ -1,7 +1,6 @@
 """
     Run as:
     nohup python melwin.py >> spyne.log 2>&1&
-
 """
 
 from spyne import rpc, srpc, ServiceBase, ComplexModel, Iterable,\
@@ -275,7 +274,7 @@ class MelwinService(ServiceBase):
             if MelwinId is None:
                 pass
             elif MelwinId < 0:
-                melwin_query = '%s,"MelwinId":null' % melwin_query
+                melwin_query = '%s,"$or": [{"MelwinId": null}, {"MelwinId": {"$exists": false}}]' % melwin_query
             elif MelwinId > 0:
                 melwin_query = '%s,"MelwinId":{"$ne":null}' % melwin_query
             else:
