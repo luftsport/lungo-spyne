@@ -276,7 +276,7 @@ class MelwinService(ServiceBase):
         try:
             if vUserId == api.ELEFUN_USERNAME and vPassword == api.ELEFUN_PASSWORD:
                 member_resp = requests.get(
-                    '%s/ka/members?where={"activities.PathName": "Luftsport/Modellfly", "$or": [{"MelwinId": %s}, {"Id": %s}]}' %
+                    '%s/members?where={"activities.PathName": "Luftsport/Modellfly", "$or": [{"MelwinId": %s}, {"Id": %s}]}' %
                     (get_api_url(), vMemberNo, vMemberNo),
                     headers=get_api_headers())
 
