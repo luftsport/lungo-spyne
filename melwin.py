@@ -264,7 +264,7 @@ class MelwinService(ServiceBase):
 
         return u'Hello, %s' % name
 
-    @srpc(Unicode, Unicode, Integer, Array(Integer), Integer, _returns=Elefun)
+    @srpc(Unicode, Unicode, Integer, _returns=Elefun)
     def elefun(vUserId, vPassword, vMemberNo):
         """
         Valid members of Modellfly
