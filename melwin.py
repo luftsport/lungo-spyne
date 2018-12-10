@@ -3,7 +3,7 @@
     nohup python melwin.py >> spyne.log 2>&1&
 """
 
-from spyne import rpc, srpc, ServiceBase, ComplexModel, Iterable,\
+from spyne import rpc, srpc, ServiceBase, ComplexModel, Iterable, \
     Integer, Unicode, Boolean, Date, DateTime, Array, \
     AnyXml, AnyDict, Mandatory, Application
 
@@ -18,10 +18,13 @@ import api
 import passbuy
 
 from lxml import etree
+
+
 class ClubsPayment(ComplexModel):
     ClubId = Integer
     PaymentStatus = Integer
     Active = Boolean
+
 
 class Activity(ComplexModel):
     ClubId = Integer
@@ -32,25 +35,30 @@ class Activity(ComplexModel):
     IsPassive = Boolean
     FunctionId = Integer
 
+
 class Magazine(ComplexModel):
     Name = Unicode
     ProductDetailId = Integer
     Selected = Boolean
+
 
 class Magazines(ComplexModel):
     ClubOrgId = Integer
     ClubName = Unicode
     Details = Array(Magazine)
 
+
 class Product(ComplexModel):
     Name = Unicode
     ProductDetailId = Integer
     Selected = Boolean
 
+
 class Products(ComplexModel):
     ClubOrgId = Integer
     ClubName = Unicode
     Details = Array(Product)
+
 
 # print(spyne._version)PersonID, Etternavn, Fornavn, fødselsdato ,kjønn, epost, mobiltelefon Postadresse, postnummer
 # Takes the return and transforms to
@@ -79,7 +87,7 @@ class Person(ComplexModel):
     clubs_payment = Array(ClubsPayment)
     Magazines = Array(Magazines)
     Products = Array(Products)
-    #clubs = Array(Integer)
+    # clubs = Array(Integer)
 
 
 class MelwinUpdated(ComplexModel):
@@ -88,12 +96,14 @@ class MelwinUpdated(ComplexModel):
     PersonId = Integer
     MelwinId = Integer
 
+
 class LoginResponse(ComplexModel):
     Status = Unicode
     StatusCode = Integer
     Message = Unicode
     MelwinId = Integer
     PersonId = Integer
+
 
 class Org(ComplexModel):
     Address = Unicode
@@ -116,25 +126,36 @@ class Org(ComplexModel):
     _etag = Unicode
     _id = Unicode
 
+
+class Elefun(ComplexModel):
+    vReturn = Boolean
+    vName = Unicode
+
+
 class PasswordModel(Unicode):
-    #__namespace__ = 'http://docs.oasis-open.org/wss/2004/01/oasis-200401-wss-wssecurity-secext-1.0.xsd'
+    # __namespace__ = 'http://docs.oasis-open.org/wss/2004/01/oasis-200401-wss-wssecurity-secext-1.0.xsd'
     pass
 
+
 class WSSEAuth(ComplexModel):
-    #__namespace__ = 'http://docs.oasis-open.org/wss/2004/01/oasis-200401-wss-wssecurity-secext-1.0.xsd'
+    # __namespace__ = 'http://docs.oasis-open.org/wss/2004/01/oasis-200401-wss-wssecurity-secext-1.0.xsd'
     Username = Unicode
     Password = Unicode
 
+
 class WSSE(ComplexModel):
-    #__namespace__ = 'http://docs.oasis-open.org/wss/2004/01/oasis-200401-wss-wssecurity-secext-1.0.xsd#UsernameToken'
+    # __namespace__ = 'http://docs.oasis-open.org/wss/2004/01/oasis-200401-wss-wssecurity-secext-1.0.xsd#UsernameToken'
     UsernameToken = WSSEAuth
+
 
 class UsernameToken(ComplexModel):
     UsernameToken = WSSEAuth
 
+
 class Security(ComplexModel):
-    #__namespace__ = 'http://docs.oasis-open.org/wss/2004/01/oasis-200401-wss-wssecurity-secext-1.0.xsd'
+    # __namespace__ = 'http://docs.oasis-open.org/wss/2004/01/oasis-200401-wss-wssecurity-secext-1.0.xsd'
     UsernameToken = WSSEAuth
+
 
 def get_api_key():
     return 'Basic %s' % api.key
@@ -152,8 +173,8 @@ def get_api_headers():
         'Accept-Encoding': 'gzip, deflate, br'
     }
 
-def get_club_id(kl_id):
 
+def get_club_id(kl_id):
     club_resp = requests.get('%s/clubs/?where={"NifOrganisationNumber":"%s"}' % (get_api_url(), kl_id),
                              headers=get_api_headers())
 
@@ -165,6 +186,7 @@ def get_club_id(kl_id):
             return int(club_resp.json()['_items'][0]['Id'])
         else:
             return -1
+
 
 def authenticate(ctx):
     wss_password = ''
@@ -186,6 +208,7 @@ def authenticate(ctx):
 
     return False
 
+
 def get_credentials(ctx):
     wss_password = ''
     wss_username = ''
@@ -204,8 +227,8 @@ def get_credentials(ctx):
 
     return wss_username, wss_password
 
-def get_melwin_id(person_id):
 
+def get_melwin_id(person_id):
     r = requests.get('%s/members/%s?projection={"Id":1, "MelwinId": 1}'
                      % (get_api_url(), person_id),
                      headers=get_api_headers())
@@ -218,11 +241,9 @@ def get_melwin_id(person_id):
     else:
         return None
 
+
 class MelwinService(ServiceBase):
-
     __in_header__ = Security
-
-
 
     @rpc(Unicode, Integer, _returns=Iterable(Unicode))
     def say_hello(ctx, name, numbers):
@@ -238,10 +259,46 @@ class MelwinService(ServiceBase):
         print(a)
         print('Auth result: %s' % authenticate(ctx))
         print('/HEADERS')
-        #root = etree.fromstring(ctx.in_header_doc)
-        #etree.tostring(root)
+        # root = etree.fromstring(ctx.in_header_doc)
+        # etree.tostring(root)
 
         return u'Hello, %s' % name
+
+    @srpc(Unicode, Unicode, Integer, Array(Integer), Integer, _returns=Elefun)
+    def elefun(vUserId, vPassword, vMemberNo):
+        """
+        Valid members of Modellfly
+        @param vUserId Username for login
+        @param vPassword Password for Username
+        @param vMemberNo MelwinId or PersonId (NIF) for member to validate
+        @return
+        """
+        try:
+            if vUserId == api.ELEFUN_USERNAME and vPassword == api.ELEFUN_PASSWORD:
+                member_resp = requests.get(
+                    '%s/ka/members?where={"activities.PathName": "Luftsport/Modellfly", "$or": [{"MelwinId": %s}, {"Id": %s}]}' %
+                    (get_api_url(), vMemberNo, vMemberNo),
+                    headers=get_api_headers())
+
+                if member_resp.status_code == 200:
+                    resp = member_resp.json()
+                    if '_items' in resp and len(resp['_items']) == 1:
+
+                        parents = []
+                        for a in resp['_items'][0]['activities']:
+                            if a['PathName'] == "Luftsport/Modellfly":
+                                for club in a["ParentOrgIds"]:
+                                    parents.append(club)
+
+                        parents = list(set(parents))
+
+                        for p in resp['_items'][0]['clubs_payment']:
+                            if p['ClubId'] in parents and p['PaymentStatus'] == 1:
+                                return {'vReturn': True, 'vName': resp['_items'][0]['FullName']}
+        except:
+            pass
+
+        return {'vReturn': False, 'vName': ''}
 
     @srpc(Unicode, Unicode, Integer, Array(Integer), Integer, _returns=Iterable(Person))
     def get_members(ApiKey, ClubId, MelwinId=0, PaymentStatus=[], IsActive=0):
@@ -254,7 +311,6 @@ class MelwinService(ServiceBase):
         @param IsActive integer 1=True, -1=False, 0=all
         @return
         """
-
         if ApiKey == api.key_melwin:
 
             club_id = get_club_id(ClubId)
@@ -270,7 +326,6 @@ class MelwinService(ServiceBase):
                 melwin_query = '"clubs_active": {"$in": [%s]}' % (
                     club_id)
 
-
             if MelwinId is None:
                 pass
             elif MelwinId < 0:
@@ -282,9 +337,10 @@ class MelwinService(ServiceBase):
 
             if PaymentStatus is not None and isinstance(PaymentStatus, list) and len(PaymentStatus) > 0:
                 melwin_query = '%s,\
-                "clubs_payment": {"$elemMatch": {"ClubId": %s, "PaymentStatus": {"$in": [%s]} } } ' % (melwin_query, club_id, ','.join(str(x) for x in PaymentStatus))
+                "clubs_payment": {"$elemMatch": {"ClubId": %s, "PaymentStatus": {"$in": [%s]} } } ' % (
+                melwin_query, club_id, ','.join(str(x) for x in PaymentStatus))
                 # "$and": [{"clubs_payment": {"$elemMatch": {"ClubId": %s}}}, {"clubs_payment": {"$elemMatch": {"PaymentStatus": {"$in": [%s]}}}}]' % (melwin_query, club_id, ','.join(str(x) for x in PaymentStatus))
-                #$and: [{"clubs_payment": {"$elemMatch": {"ClubId": %s}}}, {"clubs_payment": {"$elemMatch": {"PaymentStatus": {"$in": [%s]}}}}]' % (melwin_query, club_id, ','.join(str(x) for x in PaymentStatus))
+                # $and: [{"clubs_payment": {"$elemMatch": {"ClubId": %s}}}, {"clubs_payment": {"$elemMatch": {"PaymentStatus": {"$in": [%s]}}}}]' % (melwin_query, club_id, ','.join(str(x) for x in PaymentStatus))
 
             # old melwin_query = '%s,"$and": [{"clubs_payment.ClubId": %s}, {"clubs_payment.PaymentStatus": {"$in": [%s]}}]' % \
 
@@ -329,9 +385,9 @@ class MelwinService(ServiceBase):
                                                            'IsPassive': a['IsPassive'],
                                                            'FunctionId': a['FunctionId']})
 
-                        #IsActive = Boolean
-                        #ClubId = Integer
-                        #PaymentStatus = Integer
+                        # IsActive = Boolean
+                        # ClubId = Integer
+                        # PaymentStatus = Integer
                         if club_id in m[key]['clubs_active']:
                             m[key]['IsActive'] = True
                         elif club_id in m[key]['clubs_inactive']:
@@ -343,7 +399,7 @@ class MelwinService(ServiceBase):
                                     m[key]['PaymentStatus'] = v['PaymentStatus']
                                     break
                                     # print(m[key])
-                        # exit(0)
+                                    # exit(0)
                     return m
             else:
                 return {'status': 'ERR', 'status_code': 404}
@@ -375,8 +431,8 @@ class MelwinService(ServiceBase):
                                              json={'MelwinId': MelwinId},
                                              headers=user_header)
 
-                #print(update_resp.text)
-                #print(update_resp.status_code)
+                # print(update_resp.text)
+                # print(update_resp.status_code)
                 if update_resp.status_code == 200:
                     return {'status': 'OK', 'status_code': update_resp.status_code, 'PersonId': PersonId,
                             'MelwinId': MelwinId}
@@ -409,9 +465,9 @@ class MelwinService(ServiceBase):
                 else:
                     Direction = 'up'
 
-                #, "OrgType": "Gruppe for særidrett"
+                # , "OrgType": "Gruppe for særidrett"
                 url = '%s/orgs?where={"_%s": {"$in": [%s]}}' % (
-                get_api_url(), Direction, ClubId)
+                    get_api_url(), Direction, ClubId)
 
                 resp = requests.get(url, headers=get_api_headers())
 
@@ -421,8 +477,8 @@ class MelwinService(ServiceBase):
                     for k, v in enumerate(ret):
                         if '_links' in v:
                             del ret[k]['_links']
-                    #from pprint import pprint
-                    #pprint(ret)
+                    # from pprint import pprint
+                    # pprint(ret)
                     return ret
                 else:
                     return {'status': 'ERR', 'status_code': resp.status_code, 'Message': resp.text}
@@ -430,7 +486,6 @@ class MelwinService(ServiceBase):
                 return {'status': 'ERR', 'status_code': 422}
         else:
             return {'status': 'ERR', 'status_code': 403}
-
 
     @srpc(Unicode, Unicode, Unicode, Unicode, _returns=LoginResponse)
     def login_simple(ApiKey, Username, Password, Realm='mi.nif.no'):
@@ -457,10 +512,11 @@ class MelwinService(ServiceBase):
             if isinstance(fed_cookie, requests.cookies.RequestsCookieJar):
                 person_id = pb.get_id_from_profile()
                 melwin_id = get_melwin_id(person_id)
-                return {'Message': 'Success', 'Status': 'OK', 'StatusCode': 200, 'MelwinId': melwin_id, 'PersonId': person_id}
+                return {'Message': 'Success', 'Status': 'OK', 'StatusCode': 200, 'MelwinId': melwin_id,
+                        'PersonId': person_id}
             else:
                 return {'Message': 'Success', 'Status': 'OK', 'StatusCode': 200, 'MelwinId': None,
-                            'PersonId': None}
+                        'PersonId': None}
 
     @rpc(Unicode, Unicode, _returns=LoginResponse)
     def login(ctx, ApiKey, Realm='mi.nif.no'):
@@ -483,6 +539,7 @@ class MelwinService(ServiceBase):
             if isinstance(fed_cookie, requests.cookies.RequestsCookieJar):
                 return {'Message': 'Success', 'Status': 'OK', 'StatusCode': 200}
 
+
 if __name__ == '__main__':
     from wsgiref.simple_server import make_server
 
@@ -492,8 +549,9 @@ if __name__ == '__main__':
     logging.info("listening to http://127.0.0.1:8000")
     logging.info("wsdl is at: http://localhost:8000/?wsdl")
 
-    #wsgi_app = wsgi_soap_application([MelwinService], 'spyne.melwin.soap')
-    app = Application([MelwinService], tns='spyne.melwin.soap', in_protocol=Soap11(validator='lxml'), out_protocol=Soap11())
+    # wsgi_app = wsgi_soap_application([MelwinService], 'spyne.melwin.soap')
+    app = Application([MelwinService], tns='spyne.melwin.soap', in_protocol=Soap11(validator='lxml'),
+                      out_protocol=Soap11())
     wsgi_app = WsgiApplication(app)
     server = make_server('127.0.0.1', 8000, wsgi_app)
     server.serve_forever()
