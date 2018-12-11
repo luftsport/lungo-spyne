@@ -16,7 +16,7 @@ import dateutil.parser
 import requests
 import api
 import passbuy
-
+import datetime
 from lxml import etree
 
 
@@ -293,7 +293,12 @@ class MelwinService(ServiceBase):
                         parents = list(set(parents))
 
                         for p in resp['_items'][0]['clubs_payment']:
-                            if p['ClubId'] in parents and p['PaymentStatus'] in [1, 4]:
+
+                            if p['PaymentStatus'] == 1 and datetime.datetime.now().month not in [11, 12, 1]:
+                                continue
+
+                            if p['ClubId'] in parents and p['PaymentStatus'] in [1, 4]:  # 4 betalt, 1 til forfall
+
                                 return {'vReturn': True, 'vName': resp['_items'][0]['FullName']}
         except:
             pass
@@ -338,7 +343,7 @@ class MelwinService(ServiceBase):
             if PaymentStatus is not None and isinstance(PaymentStatus, list) and len(PaymentStatus) > 0:
                 melwin_query = '%s,\
                 "clubs_payment": {"$elemMatch": {"ClubId": %s, "PaymentStatus": {"$in": [%s]} } } ' % (
-                melwin_query, club_id, ','.join(str(x) for x in PaymentStatus))
+                    melwin_query, club_id, ','.join(str(x) for x in PaymentStatus))
                 # "$and": [{"clubs_payment": {"$elemMatch": {"ClubId": %s}}}, {"clubs_payment": {"$elemMatch": {"PaymentStatus": {"$in": [%s]}}}}]' % (melwin_query, club_id, ','.join(str(x) for x in PaymentStatus))
                 # $and: [{"clubs_payment": {"$elemMatch": {"ClubId": %s}}}, {"clubs_payment": {"$elemMatch": {"PaymentStatus": {"$in": [%s]}}}}]' % (melwin_query, club_id, ','.join(str(x) for x in PaymentStatus))
 
