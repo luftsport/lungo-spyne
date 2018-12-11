@@ -293,7 +293,7 @@ class MelwinService(ServiceBase):
                         parents = list(set(parents))
 
                         for p in resp['_items'][0]['clubs_payment']:
-                            if p['ClubId'] in parents and p['PaymentStatus'] == 1:
+                            if p['ClubId'] in parents and p['PaymentStatus'] in [1, 4]:
                                 return {'vReturn': True, 'vName': resp['_items'][0]['FullName']}
         except:
             pass
