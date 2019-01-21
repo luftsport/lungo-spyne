@@ -276,7 +276,7 @@ class MelwinService(ServiceBase):
         try:
             if vUserId == api.ELEFUN_USERNAME and vPassword == api.ELEFUN_PASSWORD:
                 member_resp = requests.get(
-                    '%s/members?where={"activities.PathName": "Luftsport/Modellfly", "$or": [{"MelwinId": %s}, {"Id": %s}]}' %
+                    '%s/members?where={"activities.PathName": "Luftsport/Modellfly", "$or": [{"MelwinId": %s}, {"Id": %s}]}&max_results=50000' %
                     (get_api_url(), vMemberNo, vMemberNo),
                     headers=get_api_headers())
 
@@ -353,7 +353,7 @@ class MelwinService(ServiceBase):
             # {"$or": [{"clubs_active": {"$in": [22976]}}, {"clubs_inactive": {"$in": [22976]}}],
             # "$and": [{"clubs_payment.ClubId": 22976}, {"clubs_payment.PaymentStatus": {"$in": [0]}}]}
             if club_id > 0:
-                member_resp = requests.get('%s/members/?where={%s}' %
+                member_resp = requests.get('%s/members/?where={%s}&max_results=50000' %
                                            (get_api_url(), melwin_query),
                                            headers=get_api_headers())
 
@@ -471,7 +471,7 @@ class MelwinService(ServiceBase):
                     Direction = 'up'
 
                 # , "OrgType": "Gruppe for særidrett"
-                url = '%s/orgs?where={"_%s": {"$in": [%s]}}' % (
+                url = '%s/orgs?where={"_%s": {"$in": [%s]}}&max_results=50000' % (
                     get_api_url(), Direction, ClubId)
 
                 resp = requests.get(url, headers=get_api_headers())
