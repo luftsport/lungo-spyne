@@ -243,7 +243,7 @@ def get_melwin_id(person_id):
 
 
 class MelwinService(ServiceBase):
-    __in_header__ = Security
+    # __in_header__ = Security
 
     @rpc(Unicode, Integer, _returns=Iterable(Unicode))
     def say_hello(ctx, name, numbers):
