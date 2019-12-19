@@ -15,7 +15,7 @@ import logging
 import dateutil.parser
 import requests
 import api
-import passbuy
+from passbuy3 import passbuy
 import datetime
 from lxml import etree
 
@@ -305,8 +305,8 @@ class MelwinService(ServiceBase):
 
         return {'vReturn': False, 'vName': ''}
 
-    @srpc(Unicode, Unicode, Integer, Array(Integer), Integer, _returns=Iterable(Person))
-    def get_members(ApiKey, ClubId, MelwinId=0, PaymentStatus=[], IsActive=0):
+    @srpc(Unicode, Unicode, Integer, Array(Integer), Integer, Boolean, _returns=Iterable(Person))
+    def get_members(ApiKey, ClubId, MelwinId=0, PaymentStatus=[], IsActive=0, MergedTo=False):
         """
         Members by KL number and if MelwinId or not
         @param ApiKey secret API key String, mandatory
@@ -314,6 +314,7 @@ class MelwinService(ServiceBase):
         @param MelwinId get users with (1), without (-1) or all (0) MelwinId, defaults to 0
         @param PaymentStatus array of integers to include, defaults to all
         @param IsActive integer 1=True, -1=False, 0=all
+        @param MergedTo boolean if True include merged else do not include _merged_to entries
         @return
         """
         if ApiKey == api.key_melwin:
@@ -339,6 +340,10 @@ class MelwinService(ServiceBase):
                 melwin_query = '%s,"MelwinId":{"$ne":null}' % melwin_query
             else:
                 pass
+
+            if MergedTo is False:
+                melwin_query = '%s,"_merged_to":{"$exists": false}' % melwin_query
+
 
             if PaymentStatus is not None and isinstance(PaymentStatus, list) and len(PaymentStatus) > 0:
                 melwin_query = '%s,\
