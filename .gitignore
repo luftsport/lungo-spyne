@@ -1,4 +1,8 @@
 # Byte-compiled / optimized / DLL files
+
+passbuy3.py
+test.xml
+xsd
 __pycache__/
 *.py[cod]
 *$py.class

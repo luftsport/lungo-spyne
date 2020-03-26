@@ -243,7 +243,7 @@ def get_melwin_id(person_id):
 
 
 class MelwinService(ServiceBase):
-    # __in_header__ = Security
+    __in_header__ = Security
 
     @rpc(Unicode, Integer, _returns=Iterable(Unicode))
     def say_hello(ctx, name, numbers):
@@ -305,7 +305,7 @@ class MelwinService(ServiceBase):
 
         return {'vReturn': False, 'vName': ''}
 
-    @srpc(Unicode, Unicode, Integer, Array(Integer), Integer, Boolean, _returns=Iterable(Person))
+    @srpc(Unicode, Unicode, Integer, Array(Integer()), Integer, Boolean, _returns=Iterable(Person))
     def get_members(ApiKey, ClubId, MelwinId=0, PaymentStatus=[], IsActive=0, MergedTo=False):
         """
         Members by KL number and if MelwinId or not
@@ -318,6 +318,8 @@ class MelwinService(ServiceBase):
         @return
         """
         if ApiKey == api.key_melwin:
+            
+            limit_date = True
 
             club_id = get_club_id(ClubId)
             melwin_query = ''
@@ -331,7 +333,10 @@ class MelwinService(ServiceBase):
             elif IsActive > 0:
                 melwin_query = '"clubs_active": {"$in": [%s]}' % (
                     club_id)
-
+            
+            if limit_date is True:
+                melwin_query = '%s, "_updated": {"$gt": "%sZ"}'  % (melwin_query, (datetime.datetime.utcnow() - datetime.timedelta(hours=18)).isoformat())
+            
             if MelwinId is None:
                 pass
             elif MelwinId < 0:
@@ -371,9 +376,19 @@ class MelwinService(ServiceBase):
 
                     for key, value in enumerate(m):  # strptime(modified, '%Y-%m-%dT%H:%M:%S.000Z')
 
-                        m[key]['BirthDate'] = dateutil.parser.parse(m[key]['BirthDate'])
-                        m[key]['Updated'] = dateutil.parser.parse(m[key]['_updated'])
-                        m[key]['Created'] = dateutil.parser.parse(m[key]['_created'])
+                        try:
+                            m[key]['BirthDate'] = dateutil.parser.parse(m[key]['BirthDate'])
+                        except:
+                            m[key].pop('BirthDate', None)
+                        try:
+                            m[key]['Updated'] = dateutil.parser.parse(m[key]['_updated'])
+                        except:
+                            m[key].pop('Updated', None)
+                        try:
+                            m[key]['Created'] = dateutil.parser.parse(m[key]['_created'])
+                        except:
+                            m[key].pop('Created', None)
+                            
                         m[key]['MongoId'] = m[key]['_id']
 
                         # Assign new virtual
@@ -398,13 +413,13 @@ class MelwinService(ServiceBase):
                         # IsActive = Boolean
                         # ClubId = Integer
                         # PaymentStatus = Integer
-                        if club_id in m[key]['clubs_active']:
+                        if club_id in m[key].get('clubs_active', []):
                             m[key]['IsActive'] = True
-                        elif club_id in m[key]['clubs_inactive']:
+                        elif club_id in m[key].get('clubs_inactive', []):
                             m[key]['IsActive'] = False
 
                         if 'clubs_payment' in m[key]:
-                            for k, v in enumerate(m[key]['clubs_payment']):
+                            for k, v in enumerate(m[key].get('clubs_payment', [])):
                                 if int(v['ClubId']) == int(club_id):
                                     m[key]['PaymentStatus'] = v['PaymentStatus']
                                     break
