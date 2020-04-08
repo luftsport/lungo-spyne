@@ -157,26 +157,10 @@ class Security(ComplexModel):
     UsernameToken = WSSEAuth
 
 
-def get_api_key():
-    return 'Basic %s' % api.key
-
-
-def get_api_url():
-    return 'https://medlem.nlf.no/api/v1/ka'
-
-
-def get_api_headers():
-    return {
-        'Authorization': get_api_key(),
-        'Accept': 'application/json',
-        'Content-Type': 'application/json',
-        'Accept-Encoding': 'gzip, deflate, br'
-    }
-
 
 def get_club_id(kl_id):
-    club_resp = requests.get('%s/clubs/?where={"NifOrganisationNumber":"%s"}' % (get_api_url(), kl_id),
-                             headers=get_api_headers())
+    club_resp = requests.get('%s/clubs/?where={"NifOrganisationNumber":"%s"}' % (api.API_URL, kl_id),
+                             headers=api.API_HEADERS)
 
     if club_resp.status_code != 200:
         return -1
@@ -229,9 +213,9 @@ def get_credentials(ctx):
 
 
 def get_melwin_id(person_id):
-    r = requests.get('%s/members/%s?projection={"Id":1, "MelwinId": 1}'
-                     % (get_api_url(), person_id),
-                     headers=get_api_headers())
+    r = requests.get('%s/ka/members/%s?projection={"Id":1, "MelwinId": 1}'
+                     % (api.API_URL, person_id),
+                     headers=api.API_HEADERS)
     if r.status_code == 200:
         print(r.json())
         return r.json()['MelwinId']
@@ -276,30 +260,13 @@ class MelwinService(ServiceBase):
         try:
             if vUserId == api.ELEFUN_USERNAME and vPassword == api.ELEFUN_PASSWORD:
                 member_resp = requests.get(
-                    '%s/members?where={"activities.PathName": "Luftsport/Modellfly", "$or": [{"MelwinId": %s}, {"Id": %s}]}&max_results=50000' %
-                    (get_api_url(), vMemberNo, vMemberNo),
-                    headers=get_api_headers())
+                    '%s/persons?where={"activities": {"$in": [236]}, "id": %s}&max_results=10' % (api.API_URL, vMemberNo),
+                    headers=api.API_HEADERS)
 
                 if member_resp.status_code == 200:
                     resp = member_resp.json()
-                    if '_items' in resp and len(resp['_items']) == 1:
-
-                        parents = []
-                        for a in resp['_items'][0]['activities']:
-                            if a['PathName'] == "Luftsport/Modellfly":
-                                for club in a["ParentOrgIds"]:
-                                    parents.append(club)
-
-                        parents = list(set(parents))
-
-                        for p in resp['_items'][0]['clubs_payment']:
-
-                            if p['PaymentStatus'] == 1 and datetime.datetime.now().month not in [11, 12, 1]:
-                                continue
-
-                            if p['ClubId'] in parents and p['PaymentStatus'] in [1, 4]:  # 4 betalt, 1 til forfall
-
-                                return {'vReturn': True, 'vName': resp['_items'][0]['FullName']}
+                    if '_items' in resp and len(resp['_items']) > 0:
+                        return {'vReturn': True, 'vName': resp['_items'][0]['full_name']}
         except:
             pass
 
@@ -359,8 +326,8 @@ class MelwinService(ServiceBase):
             # "$and": [{"clubs_payment.ClubId": 22976}, {"clubs_payment.PaymentStatus": {"$in": [0]}}]}
             if club_id > 0:
                 member_resp = requests.get('%s/members/?where={%s}&max_results=50000' %
-                                           (get_api_url(), melwin_query),
-                                           headers=get_api_headers())
+                                           (api.API_URL, melwin_query),
+                                           headers=api.API_HEADERS)
 
                 if member_resp.status_code != 200:
                     return [{}]
@@ -428,16 +395,16 @@ class MelwinService(ServiceBase):
 
         if ApiKey == api.key_melwin:
 
-            user_resp = requests.get('%s/members/%s' % (get_api_url(), PersonId),
-                                     headers=get_api_headers())
+            user_resp = requests.get('%s/members/%s' % (api.API_URL, PersonId),
+                                     headers=api.API_HEADERS)
 
             if user_resp.status_code == 200:
                 user = user_resp.json()
 
-                user_header = get_api_headers()
+                user_header = api.API_HEADERS
                 user_header.update({'If-Match': user['_etag']})
 
-                update_resp = requests.patch('%s/members/%s' % (get_api_url(), user['_id']),
+                update_resp = requests.patch('%s/members/%s' % (api.API_URL, user['_id']),
                                              json={'MelwinId': MelwinId},
                                              headers=user_header)
 
@@ -477,9 +444,9 @@ class MelwinService(ServiceBase):
 
                 # , "OrgType": "Gruppe for særidrett"
                 url = '%s/orgs?where={"_%s": {"$in": [%s]}}&max_results=50000' % (
-                    get_api_url(), Direction, ClubId)
+                    api.API_URL, Direction, ClubId)
 
-                resp = requests.get(url, headers=get_api_headers())
+                resp = requests.get(url, headers=api.API_HEADERS)
 
                 if resp.status_code == 200:
                     ret = resp.json()['_items']
