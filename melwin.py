@@ -260,7 +260,7 @@ class MelwinService(ServiceBase):
         try:
             if vUserId == api.ELEFUN_USERNAME and vPassword == api.ELEFUN_PASSWORD:
                 member_resp = requests.get(
-                    '%s/persons?where={"activities": {"$in": [236]}, "id": %s}&max_results=10' % (api.API_URL, vMemberNo),
+                    '%s/persons?where={"memberships.activity": 236, "id": %s}&max_results=10' % (api.API_URL, vMemberNo),
                     headers=api.API_HEADERS)
 
                 if member_resp.status_code == 200:
